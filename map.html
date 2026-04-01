@@ -1,0 +1,2819 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EcoRide – Live-Karte</title>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Mapbox GL -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
+
+  <style>
+    :root {
+      --bg:#0b0f14;
+      --text:#eaf0ff;
+      --muted:#9aa9c3;
+      --panelA: rgba(17,24,37,0.45);
+      --panelB: rgba(14,19,30,0.38);
+      --line: rgba(255,255,255,0.08);
+      --accent: #c7df3a;
+      --accentText:#0b0f14;
+      --ink: #111;
+    }
+    html, body { height:100%; margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    #map { position:absolute; inset:0; }
+
+    .panel {
+      position:absolute; left:20px; top:20px; z-index:5;
+      background: linear-gradient(180deg, var(--panelA), var(--panelB));
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      width: min(360px, calc(100vw - 40px));
+      min-width: 320px;
+      max-height: 560px;
+      transition: max-height .3s ease;
+    }
+    .panel.collapsed { max-height: 54px; padding: 10px 12px; }
+
+    .title {
+      font-weight: 600;
+      color: var(--ink);
+      margin: 0;
+      padding: 6px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .toggle-icon { font-size: 12px; margin-left: 10px; transition: transform .25s ease; }
+    .panel.collapsed .toggle-icon { transform: rotate(180deg); }
+    /* ── Floating Theme-Toggle – Icon only, maximalistisch minimal ── */
+    .theme-toggle {
+      position: fixed;
+      bottom: 24px;
+      right: 16px;
+      z-index: 10;
+      border: none;
+      background: transparent;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      min-width: unset;
+      display: block;
+      transition: transform .15s, opacity .15s;
+    }
+    /* Light Mode: Icon dunkel */
+    .theme-toggle { color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.4); }
+    /* Dark Mode: Icon hell */
+    body.night .theme-toggle { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .theme-toggle:hover { transform: scale(1.15); }
+    .theme-toggle:active { transform: scale(0.90); opacity: 0.7; }
+
+    .row {
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:10px;
+      width:100%;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+    .panel.collapsed .row,
+    .panel.collapsed .stat,
+    .panel.collapsed .stat2,
+    .panel.collapsed .stat3,
+    .panel.collapsed .stat4,
+    .panel.collapsed .mode-switcher,
+    .panel.collapsed .mode-panel { display:none !important; }
+
+    /* ── Modus-Umschalter ── */
+    .mode-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 10px 10px 0;
+    }
+    .mode-btn {
+      flex: 1;
+      height: 30px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(199,223,58,0.25);
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+      transition: background .2s, color .2s;
+    }
+    .mode-btn.active {
+      background: rgba(199,223,58,0.85);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    .mode-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* ── Mode-Panels ── */
+    .mode-panel { margin-top: 8px; }
+
+    /* ── Mitfahrer-Panel ── */
+    /* ── Editable-Accordion: Header immer sichtbar, Body collapsible ── */
+    .pax-acc-block {
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin-top: 2px;
+    }
+    .pax-acc-block:first-child { border-top: none; margin-top: 4px; }
+
+    /* Header: immer sichtbar, klickbar zum Auf-/Zuklappen */
+    .pax-acc-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px 4px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .pax-acc-header:active { opacity: 0.75; }
+    /* Sperren wenn Suche aktiv */
+    .pax-acc-header.locked { cursor: default; opacity: 0.6; pointer-events: none; }
+
+    .pax-acc-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: rgba(234,240,255,0.40);
+      flex-shrink: 0;
+      min-width: 70px;
+    }
+    .pax-acc-value {
+      font-size: 11.5px;
+      color: rgba(234,240,255,0.55);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pax-acc-value.set { color: #4ade80; }
+    .pax-acc-edit {
+      font-size: 11px;
+      color: rgba(199,223,58,0.50);
+      flex-shrink: 0;
+      transition: color .15s;
+    }
+    .pax-acc-header:not(.locked):hover .pax-acc-edit { color: rgba(199,223,58,0.90); }
+
+    /* Body: collapsible */
+    .pax-acc-body {
+      overflow: hidden;
+      transition: max-height 0.28s ease, opacity 0.22s ease;
+      max-height: 300px;
+      opacity: 1;
+    }
+    .pax-acc-body.pax-closed {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .pax-acc-inner {
+      padding: 2px 10px 6px;
+      box-sizing: border-box;
+    }
+
+    /* ── Komprimierte Block-Abstände ── */
+    .pax-block {
+      padding: 4px 10px 0;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .pax-block-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      opacity: 0.40;
+      margin-bottom: 4px;
+    }
+    /* Schlankere Buttons */
+    .pax-btn {
+      width: 100%;
+      box-sizing: border-box;
+      height: 28px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(199,223,58,0.25);
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .pax-btn.active-pax {
+      background: rgba(199,223,58,0.85);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    /* Kompakter Status */
+    .pax-status {
+      font-size: 11px;
+      padding: 3px 4px;
+      color: rgba(234,240,255,0.70);
+    }
+    .pax-status.set { color: #4ade80; }
+    .pax-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin: 5px 10px;
+    }
+    .pax-time-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+    .pax-time-btn {
+      flex: 1 1 calc(33% - 4px);
+      min-width: 52px;
+      height: 30px;
+      border-radius: 999px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid rgba(199,223,58,0.20);
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+    }
+    .pax-time-btn.selected {
+      background: rgba(199,223,58,0.80);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    .pax-time-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .pax-locked-hint {
+      font-size: 10px;
+      opacity: 0.5;
+      text-align: center;
+      padding: 2px 10px 0;
+      display: none;
+    }
+    .pax-locked-hint.show { display: block; }
+    .passenger-hint {
+      font-size: 10.5px;
+      opacity: 0.5;
+      text-align: center;
+      margin-top: 4px;
+      padding: 0 10px 4px;
+    }
+
+    /* ── Mitfahrer: Zeitfenster-Stepper (kompakter) ── */
+    .pax-stepper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 4px 10px 6px;
+    }
+    .pax-step-btn {
+      width: 38px; height: 38px;
+      min-width: unset !important;
+      border-radius: 50%;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+      border: 1px solid rgba(199,223,58,0.30);
+      background: rgba(17,24,37,0.35);
+      color: #e5e7eb;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 !important;
+      transition: background .15s;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    .pax-step-btn:active { background: rgba(199,223,58,0.22); }
+    .pax-step-btn:disabled { opacity: 0.30; cursor: not-allowed; }
+    .pax-step-display {
+      flex: 1;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #eaf0ff;
+      min-width: 80px;
+      letter-spacing: 0.02em;
+    }
+
+    /* Zielmarker-Button: grüner Akzent zur visuellen Unterscheidung vom Treffpunkt */
+    #btnPaxTarget.active-pax {
+      background: rgba(74,222,128,0.85);
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    #paxTargetStatus.set { color: #4ade80; }
+
+    /* ── Mitfahrer: Such-Buttons ── */
+    .pax-search-actions {
+      display: flex;
+      gap: 6px;
+      padding: 4px 10px 4px;
+      box-sizing: border-box;
+    }
+    .pax-search-btn {
+      flex: 1;
+      height: 30px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      background: rgba(199,223,58,0.88);
+      color: #0b0f14;
+      transition: opacity .2s;
+    }
+    .pax-search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .pax-cancel-btn {
+      flex: 0 0 auto;
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(239,68,68,0.35);
+      background: rgba(239,68,68,0.12);
+      color: #f87171;
+      display: none;
+    }
+    .pax-cancel-btn.show { display: flex; align-items: center; justify-content: center; }
+
+    /* ── Mitfahrer: Trefferzähler ── */
+    .pax-match-status {
+      font-size: 12px;
+      text-align: center;
+      padding: 4px 10px 2px;
+      min-height: 20px;
+      color: rgba(234,240,255,0.70);
+      display: none;
+    }
+    .pax-match-status.show { display: block; }
+    .pax-match-status.found    { color: #4ade80; }
+    .pax-match-status.none     { color: rgba(234,240,255,0.45); }
+    .pax-match-status.cooldown { color: #fbbf24; }
+
+    .input-button-group {
+      width:100%;
+      max-width: 260px;
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items:center;
+      margin: 0 auto;
+    }
+
+    input {
+      width:100%;
+      max-width: 180px;
+      background: rgba(17,24,37,0.28);
+      border: 1px solid rgba(199,223,58,0.18);
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      color: #e5e7eb;
+      text-align: center;
+    }
+
+    .button-group {
+      width:100%;
+      display:flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: nowrap;
+      padding: 0 20px;
+      box-sizing: border-box;
+      margin: 0 auto;
+    }
+    .button-group::-webkit-scrollbar { height: 0px; }
+
+    button {
+      background: rgba(199,223,58,0.78);
+      color: var(--accentText);
+      height: 32px;
+      min-width: 80px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    button.secondary {
+      background: rgba(17,24,37,0.28);
+      border: 1px solid rgba(199,223,58,0.18);
+      color: #e5e7eb;
+      backdrop-filter: blur(10px);
+    }
+
+    .stat {
+      margin-top:10px;
+      font-size:12.5px;
+      color: var(--ink);
+      opacity:0.85;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      column-gap: 10px;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+    .stat .left { justify-self: start; display:flex; align-items:center; gap:6px; }
+    .stat .mid {
+      justify-self: center;
+      text-align:center;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      min-width:0;
+    }
+    .stat .right { justify-self: end; }
+
+    .stat2 {
+      margin-top:8px;
+      font-size:12.5px;
+      color: var(--ink);
+      opacity:0.85;
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      padding: 0 10px;
+      box-sizing: border-box;
+      align-items: center;
+    }
+    .last-left { display:flex; align-items:center; gap:8px; }
+
+    .sync {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(199,223,58,0.22);
+      color: rgba(199,223,58,0.95);
+      font-size: 12px;
+      opacity: 0.0;
+      transform: rotate(0deg);
+      transition: opacity .15s ease;
+      user-select: none;
+    }
+    .sync.on { opacity: 1.0; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .stat3 {
+      margin-top:8px;
+      font-size:12.5px;
+      color: var(--ink);
+      opacity:0.85;
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      padding: 0 10px;
+      box-sizing: border-box;
+      flex-wrap: nowrap;
+    }
+
+    /* ── NEU: Fahrten-Zähler + Mitfahrer-Name ── */
+    .stat4 {
+      margin-top:8px;
+      font-size:12.5px;
+      color: var(--ink);
+      opacity:0.85;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+
+    .pulse { display:inline-block; padding: 0 6px; border-radius: 999px; transition: background-color .35s ease; }
+    .pulse.flash { background: rgba(199,223,58,0.22); }
+    .pulse.ride-flash { background: rgba(255,149,0,0.22); }
+
+    .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; }
+    .dot.on { background:#22c55e; }
+
+    .hint-inline {
+      display:none;
+      color:#00FF00;
+      font-size:12px;
+      line-height:1.15;
+      font-weight:600;
+      text-shadow: 0 1px 0 rgba(0,0,0,.18);
+      white-space: normal;
+      word-break: break-word;
+      max-width: 190px;
+      text-align: center;
+    }
+    .hint-inline.show { display:block; }
+
+    /* ── Popup Basis ── */
+    .mapboxgl-popup-content {
+      background: rgba(17,24,37,0.92);
+      color: #eaf0ff;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      box-shadow: 0 18px 44px rgba(0,0,0,.40);
+      padding: 10px 10px 8px;
+      backdrop-filter: blur(10px);
+      min-width: 210px;
+    }
+    .mapboxgl-popup-tip {
+      border-top-color: rgba(17,24,37,0.92) !important;
+      border-bottom-color: rgba(17,24,37,0.92) !important;
+    }
+    .er-pop-title {
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+      margin: 0 0 6px;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .er-pop-sub {
+      font-size: 12px;
+      color: rgba(234,240,255,0.78);
+      margin: 0 0 8px;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .er-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+      white-space: nowrap;
+    }
+    .er-badge.ok    { border-color: rgba(34,197,94,0.35); }
+    .er-badge.stale { border-color: rgba(239,68,68,0.35); }
+    .er-badge.ride  { background: rgba(255,149,0,0.12); border-color: rgba(255,149,0,0.45); color: #ffb347; }
+
+    .er-pop-actions { display:flex; gap: 8px; margin-top: 8px; }
+    .er-pop-btn {
+      flex:1;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(199,223,58,0.18);
+      background: rgba(17,24,37,0.35);
+      color: #eaf0ff;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .er-pop-btn.primary {
+      background: rgba(199,223,58,0.85);
+      color: #0b0f14;
+      border: none;
+    }
+    .er-pop-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── NEU: Ride-Popup spezifisch ── */
+    .er-pop-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      margin: 8px 0;
+    }
+    .er-pop-details {
+      font-size: 12px;
+      color: rgba(234,240,255,0.70);
+      display:flex;
+      justify-content:center;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .er-pop-input {
+      width: 100%;
+      background: rgba(17,24,37,0.50);
+      border: 1px solid rgba(255,255,255,0.14);
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #e5e7eb;
+      box-sizing: border-box;
+      margin-bottom: 6px;
+      text-align: left;
+    }
+    .er-pop-status {
+      font-size: 11px;
+      margin-top: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      text-align: center;
+      display: none;
+    }
+    .er-pop-status.ok  { background: rgba(34,197,94,0.13); color: #4ade80; display:block; }
+    .er-pop-status.err { background: rgba(239,68,68,0.12); color: #f87171; display:block; }
+
+    @media (max-width: 900px) {
+      .panel { left:12px; top:12px; right:12px; width:auto; min-width: 280px; }
+      input { height: 40px; font-size: 15px; }
+      button { height: 36px; font-size: 14px; }
+      .hint-inline { max-width: 160px; }
+    }
+
+    /* Mobile: Mapbox-Controls ausblenden */
+    @media (max-width: 900px) {
+      .mapboxgl-ctrl-bottom-right,
+      .mapboxgl-ctrl-bottom-left,
+      .mapboxgl-ctrl-logo,
+      .mapboxgl-ctrl-attrib { display: none !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <button class="theme-toggle" id="btnNightMode" title="Dark / Light umschalten" aria-label="Theme wechseln">🌙</button>
+
+  <div class="panel collapsed">
+    <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
+
+    <!-- ── Modus-Umschalter ── -->
+    <div class="mode-switcher">
+      <button id="btnModeDriver"    class="mode-btn active">Fahrer</button>
+      <button id="btnModePassenger" class="mode-btn">Mitfahrer</button>
+    </div>
+
+    <!-- ── FAHRER-PANEL ── -->
+    <div class="mode-panel" id="driverPanel">
+      <div class="row">
+        <div class="input-button-group">
+          <input id="driverFilter" placeholder="Driver ID" />
+        </div>
+        <div class="button-group">
+          <button id="btnApply">Folgen</button>
+          <button id="btnAll" class="secondary">Aufheben</button>
+          <button id="btnToggleRoutes" class="secondary">Einblenden</button>
+          <button id="btnActiveOnly" class="secondary">Aktive</button>
+        </div>
+      </div>
+
+      <div class="stat">
+        <div class="left">
+          <span id="rtDot" class="dot"></span>
+          <span id="rtTxt">Realtime: AUS</span>
+        </div>
+        <div class="mid">
+          <span id="hintInline" class="hint-inline"></span>
+        </div>
+        <div class="right">
+          <span id="countTxt">Marker: 0</span>
+        </div>
+      </div>
+
+      <div class="stat2">
+        <div class="last-left">
+          <span>Letztes Update:</span>
+          <span id="syncIcon" class="sync" title="Aktualisiere…">⟳</span>
+        </div>
+        <div id="lastTxt">–</div>
+      </div>
+
+      <div class="stat3">
+        <div>Aktiv: <span id="impactActive" class="pulse">–</span></div>
+        <div>Punkte 10m: <span id="impactPoints10" class="pulse">–</span></div>
+        <div>Marker: <span id="impactMarkers" class="pulse">0</span></div>
+      </div>
+
+      <div class="stat4">
+        <div>🟠 Fahrten: <span id="rideCountTxt" class="pulse">0</span></div>
+        <div style="font-size:11px;opacity:0.55">Ziel = orangener Punkt</div>
+      </div>
+    </div><!-- /driverPanel -->
+
+    <!-- ── MITFAHRER-PANEL ── -->
+    <div class="mode-panel" id="passengerPanel" style="display:none">
+
+      <!-- Accordion Block 1: Treffpunkt – Header immer sichtbar -->
+      <div class="pax-acc-block" id="paxAccBlock1">
+        <div class="pax-acc-header" id="paxAccHeader1" role="button" aria-expanded="true">
+          <span class="pax-acc-label">Treffpunkt</span>
+          <span class="pax-acc-value" id="paxAccVal1">nicht gesetzt</span>
+          <span class="pax-acc-edit">✎</span>
+        </div>
+        <div class="pax-acc-body" id="paxAccBody1">
+          <div class="pax-acc-inner">
+            <button class="pax-btn" id="btnPaxGps">GPS-Standort verwenden</button>
+            <button class="pax-btn" id="btnPaxMarker">Marker setzen / verschieben</button>
+            <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion Block 2: Startzeit – sichtbar sobald Treffpunkt gesetzt -->
+      <div class="pax-acc-block" id="paxAccBlock2" style="display:none">
+        <div class="pax-acc-header" id="paxAccHeader2" role="button" aria-expanded="false">
+          <span class="pax-acc-label">Startzeit</span>
+          <span class="pax-acc-value" id="paxAccVal2">nicht gesetzt</span>
+          <span class="pax-acc-edit">✎</span>
+        </div>
+        <div class="pax-acc-body pax-closed" id="paxTimeBlock">
+          <div class="pax-acc-inner">
+            <div class="pax-stepper" id="paxStepper">
+              <button class="pax-step-btn" id="btnStepMinus" aria-label="Früher">−</button>
+              <div class="pax-step-display" id="paxStepDisplay">jetzt</div>
+              <button class="pax-step-btn" id="btnStepPlus" aria-label="Später">+</button>
+            </div>
+            <div class="pax-locked-hint" id="paxLockedHint">Suche abbrechen zum Ändern</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion Block 3: Ziel – sichtbar sobald Treffpunkt gesetzt -->
+      <div class="pax-acc-block" id="paxAccBlock3" style="display:none">
+        <div class="pax-acc-header" id="paxAccHeader3" role="button" aria-expanded="false">
+          <span class="pax-acc-label">Ziel</span>
+          <span class="pax-acc-value" id="paxAccVal3">nicht gesetzt</span>
+          <span class="pax-acc-edit">✎</span>
+        </div>
+        <div class="pax-acc-body pax-closed" id="paxTargetBlock">
+          <div class="pax-acc-inner">
+            <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen / verschieben</button>
+            <div class="pax-status" id="paxTargetStatus">Kein Ziel gesetzt</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Block 4: Suche starten – sichtbar wenn Treffpunkt + Ziel gesetzt -->
+      <div id="paxSearchBlock" style="display:none">
+        <div class="pax-divider"></div>
+        <div class="pax-search-actions">
+          <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
+          <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
+        </div>
+        <div class="pax-match-status" id="paxMatchStatus"></div>
+      </div>
+
+      <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
+    </div><!-- /passengerPanel -->
+
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────────
+    // DEBUG
+    // ─────────────────────────────────────────────────
+    const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
+    function logError(code, message, ctx = {}) {
+      console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
+    }
+    function setSafeTextContent(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text ?? "";
+      else if (DEBUG) console.warn(`[DEBUG] Element #${id} nicht gefunden!`);
+    }
+
+    // ─────────────────────────────────────────────────
+    // CONFIG
+    // ─────────────────────────────────────────────────
+    const CONFIG = window.ER_CONFIG ?? {
+      mapboxToken:     "pk.eyJ1IjoicGFwYXZlcm8iLCJhIjoiY21qZDJwZWxyMDJqbDNlczhuaGZseDdiciJ9.fO0N4kG-JevJi2dUGphOEQ",
+      supabaseUrl:     "https://ihpszsoivqcrkkiucjvv.supabase.co",
+      supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlocHN6c29pdnFjcmtraXVjanZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0NjMyNDAsImV4cCI6MjA3NDAzOTI0MH0.RTqNvbND-SlW-ekKGsXEO5CY0ai8zgvQwRm_17WtUmw",
+    };
+
+    // ─────────────────────────────────────────────────
+    // KONSTANTEN
+    // ─────────────────────────────────────────────────
+    const ACTIVE_ONLY_MS        = 2  * 60_000;
+    const STALE_VISUAL_MS       = 2  * 60_000;
+    const STALE_MS              = 5  * 60_000;
+    const PRUNE_EVERY_MS        = 10_000;
+    const ROUTE_MS              = 10 * 60_000;
+    const MAX_POINTS            = 200;
+    const DEFAULT_CENTER        = [8.8, 53.1];
+    const DEFAULT_ZOOM          = 10;
+    const ROUTE_COLORS          = ["#c7df3a","#3bb2d0","#ff6b6b","#a55eea","#4dabf7","#f06595","#ffd43b","#7bed9f"];
+    const IMPACT_OK_MS          = 10_000;
+    const IMPACT_MIN_MS         = 5_000;
+    const IMPACT_MAX_MS         = 60_000;
+    const IMPACT_BACKOFF        = [5_000,10_000,20_000,40_000,60_000];
+
+    // Driver source/layers (bestehend)
+    const DRIVERS_SOURCE        = "er-drivers";
+    const LAYER_CLUSTER_CIRCLE  = "er-cluster";
+    const LAYER_CLUSTER_COUNT   = "er-cluster-count";
+    const LAYER_POINTS          = "er-points";
+    const LAYER_POINTS_SELECTED = "er-points-selected";
+
+    // NEU: Rides source/layer
+    const RIDES_SOURCE          = "er-rides";
+    const LAYER_RIDE_DEST       = "er-ride-dest";
+
+    // NEU: Ride-Routen (Linie Fahrer → Ziel)
+    const RIDES_ROUTE_SOURCE    = "er-ride-routes";
+    const LAYER_RIDE_ROUTES     = "er-ride-routes-line";
+
+    // NEU: Mitfahrer-Suche: Highlight-Layer
+    const PAX_MATCH_SOURCE      = "er-pax-match";
+    const LAYER_PAX_MATCH       = "er-pax-match-ring";
+
+    // Matching-Konstanten
+    const PAX_MATCH_RADIUS_KM   = 5.0;   // Fahrer muss innerhalb 5 km vom Treffpunkt sein
+    const PAX_MATCH_TIME_SLACK  = 10;    // +10 Min Puffer auf Zeitfenster
+
+    // BBox / Debounce
+    const BBOX_DEBOUNCE_MS        = 350;
+    const BBOX_LIMIT_LATEST       = 800;
+    const BBOX_LIMIT_ROUTE_POINTS = 4000;
+    const BBOX_PAD_FACTOR         = 0.15;
+
+    // Realtime watchdog
+    const RT_WATCHDOG_MS      = 8_000;
+    const RT_STALE_MS         = 12_000;
+    const RT_RECONNECT_BACKOFF = [1000,2000,5000,10000,20000];
+
+    // ─────────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────────
+    let sb          = null;
+    let map         = null;
+    let channel     = null;       // Realtime: live_positions
+    let ridesChannel = null;      // NEU: Realtime: rides
+
+    const positions   = new Map();
+    const routePoints = new Map();
+    const activeRides = new Map(); // NEU: rideId → v_aktive_fahrten row
+    const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
+    const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
+
+    function getActiveDriverCount() {
+      return new Set(
+        [...activeRides.values()]
+          .map(r => normId(r.driver_id))
+          .filter(Boolean)
+      ).size;
+    }
+
+    let routesReady     = false;
+    let routesVisible   = true;
+    let activeOnlyMode  = false;
+    let currentFilter    = "";
+    let currentFilterKey = "";
+
+    // Impact
+    let ridesPolTimer    = null;  // periodischer Rides-Poll
+    let impactTimer      = null;
+    let impactInFlight   = false;
+    let impactBackoffIdx = 0;
+    let lastImpactOkAt   = 0;
+
+    // Popups
+    let markerPopup = null;
+    let ridePopup   = null;       // NEU
+
+    // Request sequencing
+    let latestFetchSeq = 0;
+    let routeFetchSeq  = 0;
+    let ridesFetchSeq  = 0;       // NEU
+
+    // Map listener refs
+    let onMoveEnd = null;
+    let onZoomEnd = null;
+
+    // Realtime watchdog
+    let rtWatchdogTimer  = null;
+    let rtReconnectIdx   = 0;
+    let rtLastOkAt       = 0;
+    let rtLastStatus     = "INIT";
+    let rtConnecting     = false;
+
+    // NEU: Mitfahrer-Identität (localStorage-basiert)
+    let mitfahrerId = localStorage.getItem("er_mitfahrer_id") || null;
+
+    // NEU: Mitfahrer-Suche State
+    const paxMatchedKeys = new Set();  // driverKeys der gematchten Fahrer
+
+    // Zielmarker State
+    let paxTargetLat    = null;
+    let paxTargetLng    = null;
+    let paxTargetMarker = null;
+    let paxTargetMode   = false;
+    let paxTimeOpen     = false;  // Stepper manuell geöffnet → updatePaxUI respektiert das
+
+    // GPS-Verifikation: Suche und Anfrage nur mit echtem GPS-Standort möglich
+    let paxHasGps = false;
+
+    // Cooldown-Schutz (nur nach „Abbrechen")
+    const PAX_COOLDOWN_MS      = 15_000;  // 15s Cooldown nach Abbrechen
+    const PAX_MAX_STARTS       = 3;       // max. 3 Neustarts im Zeitfenster
+    const PAX_MAX_WINDOW_MS    = 60_000;  // Zeitfenster für Limit (60s)
+    let paxCooldownUntil       = 0;       // Timestamp bis wann gesperrt
+    let paxCooldownTimer       = null;    // Interval für Countdown-Anzeige
+    const paxStartTimes        = [];      // Timestamps der Suchstarts (für Rate-Limit)
+
+    // ─────────────────────────────────────────────────
+    // MODUS-UMSCHALTER (Fahrer / Mitfahrer)
+    // ─────────────────────────────────────────────────
+    // Modus: "driver" | "passenger"
+    let appMode = localStorage.getItem("er_mode") || "driver";
+
+    function isModeLocked() {
+      // Gesperrt wenn Fahrer aktiv (Tracking oder Fahrt läuft)
+      // Erkennbar: manualEndedAt === 0 und activeRides oder positions befüllt
+      // Einfache Heuristik: positions.size > 0 = Fahrer-Session aktiv
+      return positions.size > 0 || activeRides.size > 0;
+    }
+
+    function setMode(mode) {
+      if (mode === appMode) return;
+      if (isModeLocked()) {
+        showHint("Erst aktive Fahrt / Tracking beenden.");
+        return;
+      }
+      appMode = mode;
+      localStorage.setItem("er_mode", mode);
+      renderModeUI();
+    }
+
+    function renderModeUI() {
+      const btnDriver    = document.getElementById("btnModeDriver");
+      const btnPassenger = document.getElementById("btnModePassenger");
+      const driverPanel  = document.getElementById("driverPanel");
+      const passengerPanel = document.getElementById("passengerPanel");
+      if (!btnDriver) return;
+
+      const locked = isModeLocked();
+
+      btnDriver.classList.toggle("active", appMode === "driver");
+      btnPassenger.classList.toggle("active", appMode === "passenger");
+
+      // Anderer Modus-Button sperren wenn aktive Session
+      btnDriver.disabled    = locked && appMode !== "driver";
+      btnPassenger.disabled = locked && appMode !== "passenger";
+
+      driverPanel.style.display    = appMode === "driver"    ? "" : "none";
+      passengerPanel.style.display = appMode === "passenger" ? "" : "none";
+    }
+
+    document.getElementById("btnModeDriver")?.addEventListener("click",    () => setMode("driver"));
+    document.getElementById("btnModePassenger")?.addEventListener("click", () => setMode("passenger"));
+
+    // ─────────────────────────────────────────────────
+    // MITFAHRER-PANEL LOGIK
+    // ─────────────────────────────────────────────────
+    let paxMarker      = null;  // Mapbox Marker für Treffpunkt
+    let paxLat         = null;
+    let paxLng         = null;
+    let paxTimeMin     = 0;     // gewähltes Zeitfenster in Minuten (0 = jetzt)
+    let paxSearchActive = false; // Suche gestartet → Zeitfenster gesperrt
+    let paxMarkerMode  = false; // Nutzer kann Marker per Klick setzen
+
+    // Gibt true zurück wenn Cooldown aktiv → Suchparameter dürfen nicht geändert werden
+    function isPaxInputLocked() {
+      return Date.now() < paxCooldownUntil;
+    }
+
+    // Gibt true zurück wenn der Marker aktuell verschiebbar sein darf
+    function isPaxMarkerDraggable() {
+      // Nur verschiebbar wenn explizit im manuellen Marker-Modus
+      return paxMarkerMode && !paxSearchActive && !isPaxInputLocked();
+    }
+
+    // Draggability des Markers an aktuellen State anpassen
+    function syncPaxMarkerDraggable() {
+      if (!paxMarker) return;
+      paxMarker.setDraggable(isPaxMarkerDraggable());
+    }
+
+    // Marker-Setzmodus sauber beenden (Button-State + interne Flag)
+    function exitPaxMarkerMode() {
+      if (!paxMarkerMode) return;
+      paxMarkerMode = false;
+      const btn = document.getElementById("btnPaxMarker");
+      if (btn) btn.classList.remove("active-pax");
+    }
+
+    // ── Zielmarker ──
+    function isPaxTargetDraggable() {
+      // Nur draggable wenn explizit im Ziel-Bearbeitungsmodus
+      return paxTargetMode && !paxSearchActive && !isPaxInputLocked();
+    }
+
+    function syncPaxTargetMarkerDraggable() {
+      if (!paxTargetMarker) return;
+      paxTargetMarker.setDraggable(isPaxTargetDraggable());
+    }
+
+    function setPaxTargetPos(lng, lat) {
+      if (isPaxInputLocked() || paxSearchActive) return;
+      paxTargetLng = lng; paxTargetLat = lat;
+      if (!paxTargetMarker) {
+        paxTargetMarker = new mapboxgl.Marker({ color: "#4ade80", draggable: isPaxTargetDraggable() })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        paxTargetMarker.on("dragend", () => {
+          const pos = paxTargetMarker.getLngLat();
+          paxTargetLng = pos.lng; paxTargetLat = pos.lat;
+          updatePaxUI();
+        });
+      } else {
+        paxTargetMarker.setLngLat([lng, lat]);
+      }
+      updatePaxUI();
+    }
+
+    function exitPaxTargetMode() {
+      if (!paxTargetMode) return;
+      paxTargetMode = false;
+      const btn = document.getElementById("btnPaxTarget");
+      if (btn) btn.classList.remove("active-pax");
+    }
+
+    document.getElementById("btnPaxTarget")?.addEventListener("click", () => {
+      if (paxTargetMode) {
+        paxTargetMode = false;
+        document.getElementById("btnPaxTarget").classList.remove("active-pax");
+        updatePaxUI();
+        return;
+      }
+      exitPaxMarkerMode(); // sicherstellen dass Treffpunkt-Modus beendet ist
+      paxTargetMode = true;
+      document.getElementById("btnPaxTarget").classList.add("active-pax");
+      showHint("Ziel auf der Karte antippen.");
+      updatePaxUI();
+    });
+
+    function setPaxMarkerPos(lng, lat, fromGps = false) {
+      if (isPaxInputLocked()) return;
+      paxLng = lng; paxLat = lat;
+      // GPS-Verifikation bleibt erhalten – Treffpunkt anpassen hebt Verifikation nicht auf
+      if (!paxMarker) {
+        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        paxMarker.on("dragend", () => {
+          const pos = paxMarker.getLngLat();
+          paxLng = pos.lng; paxLat = pos.lat;
+          // paxHasGps bleibt unverändert – Treffpunkt nachjustieren hebt Verifikation nicht auf
+          updatePaxUI();
+        });
+      } else {
+        paxMarker.setLngLat([lng, lat]);
+      }
+      updatePaxUI();
+    }
+
+    function updatePaxUI() {
+      const statusEl    = document.getElementById("paxMarkerStatus");
+      const timeBlock    = document.getElementById("paxTimeBlock");
+      const lockedHint   = document.getElementById("paxLockedHint");
+      const hintEl       = document.getElementById("paxHint");
+      const targetBlock  = document.getElementById("paxTargetBlock");
+      const targetStatus = document.getElementById("paxTargetStatus");
+      const btnTarget    = document.getElementById("btnPaxTarget");
+      const searchBlock  = document.getElementById("paxSearchBlock");
+      const searchBtn   = document.getElementById("btnPaxSearch");
+      const cancelBtn   = document.getElementById("btnPaxCancel");
+      if (!statusEl) return;
+
+      const hasMarker = paxLat !== null && paxLng !== null;
+      const hasTime   = true; // Stepper startet bei 0 (jetzt), immer gesetzt
+
+      if (hasMarker) {
+        statusEl.textContent = `Treffpunkt gesetzt ✅  (${paxLat.toFixed(5)}, ${paxLng.toFixed(5)})`;
+        statusEl.className = "pax-status set";
+        timeBlock.style.display = "";
+      } else {
+        statusEl.textContent = "Kein Treffpunkt gesetzt";
+        statusEl.className = "pax-status";
+        timeBlock.style.display = "none";
+        if (searchBlock) searchBlock.style.display = "none";
+        hintEl.textContent = "Treffpunkt setzen um passende Fahrer zu sehen.";
+      }
+
+      // onCooldown früh deklarieren – wird von mehreren Blöcken unten gebraucht
+      const onCooldown = isPaxInputLocked();
+
+      const hasTarget = paxTargetLat !== null && paxTargetLng !== null;
+
+      // Zielblock: sichtbar sobald Treffpunkt gesetzt
+      if (targetBlock) targetBlock.style.display = hasMarker ? "" : "none";
+
+      // Zielstatus
+      if (targetStatus) {
+        if (hasTarget) {
+          targetStatus.textContent = `Ziel gesetzt ✅  (${paxTargetLat.toFixed(5)}, ${paxTargetLng.toFixed(5)})`;
+          targetStatus.className = "pax-status set";
+        } else {
+          targetStatus.textContent = "Kein Ziel gesetzt";
+          targetStatus.className = "pax-status";
+        }
+      }
+
+      // Ziel-Button: gesperrt bei aktiver Suche oder Cooldown
+      if (btnTarget) {
+        btnTarget.disabled = paxSearchActive || onCooldown;
+        btnTarget.classList.toggle("active-pax", paxTargetMode);
+      }
+
+      // Suchblock: nur wenn Treffpunkt + Ziel gesetzt
+      if (searchBlock) {
+        searchBlock.style.display = (hasMarker && hasTarget) ? "" : "none";
+      }
+
+      // Hint-Text je nach Status
+      if (!hasMarker) {
+        hintEl.textContent = "Treffpunkt setzen um die Suche vorzubereiten.";
+      } else if (hasMarker && !hasTarget) {
+        hintEl.textContent = "Ziel auf der Karte setzen.";
+      } else if (hasMarker && hasTarget && !paxHasGps && !paxSearchActive) {
+        hintEl.textContent = "Bitte zuerst GPS-Standort bestätigen um die Suche zu starten.";
+      } else if (hasMarker && hasTarget && paxHasGps && !paxSearchActive) {
+        hintEl.textContent = "Suche starten wenn du bereit bist.";
+      } else if (paxSearchActive) {
+        hintEl.textContent = "Suche aktiv – passende Fahrer sind hervorgehoben.";
+      }
+
+      // Stepper synchronisieren
+      syncStepperUI();
+      lockedHint.classList.toggle("show", paxSearchActive);
+
+      // GPS + Marker-Buttons während Cooldown sperren
+      const btnGps    = document.getElementById("btnPaxGps");
+      const btnMarker = document.getElementById("btnPaxMarker");
+      if (btnGps)    btnGps.disabled    = paxSearchActive || onCooldown;
+      if (btnMarker) btnMarker.disabled = paxSearchActive || onCooldown;
+
+      // Such-Button: gesperrt wenn aktive Suche, Cooldown, kein Ziel, oder kein GPS
+      const hasTargetForBtn = paxTargetLat !== null && paxTargetLng !== null;
+      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || !hasTargetForBtn || !paxHasGps;
+      if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
+
+      // Draggability beider Marker synchron halten
+      syncPaxMarkerDraggable();
+      syncPaxTargetMarkerDraggable();
+
+      // Modi beenden sobald Suche aktiv oder Cooldown
+      if (paxSearchActive || onCooldown) {
+        exitPaxMarkerMode();
+        exitPaxTargetMode();
+      }
+
+      // ── Editable-Accordion: Header-Werte + Body-Sichtbarkeit ──
+      // Regel: Body offen wenn gerade aktiver Schritt; geschlossen wenn fertig.
+      // Header IMMER klickbar (außer Suche aktiv) → öffnet Body + aktiviert Modus.
+
+      const locked = paxSearchActive || onCooldown;
+
+      // --- Block 1: Treffpunkt ---
+      const b1val  = document.getElementById("paxAccVal1");
+      const b1body = document.getElementById("paxAccBody1");
+      const b1hdr  = document.getElementById("paxAccHeader1");
+      if (b1val) {
+        if (hasMarker) {
+          b1val.textContent = "gesetzt ✅";
+          b1val.className = "pax-acc-value set";
+        } else {
+          b1val.textContent = "nicht gesetzt";
+          b1val.className = "pax-acc-value";
+        }
+      }
+      if (b1body) {
+        // Offen wenn: kein Marker gesetzt ODER Marker-Bearbeitungs-Modus aktiv
+        const b1open = !hasMarker || paxMarkerMode;
+        b1body.classList.toggle("pax-closed", !b1open);
+      }
+      if (b1hdr) b1hdr.classList.toggle("locked", locked);
+
+      // --- Block 2: Startzeit ---
+      const b2block = document.getElementById("paxAccBlock2");
+      const b2val   = document.getElementById("paxAccVal2");
+      const b2body  = document.getElementById("paxTimeBlock");
+      const b2hdr   = document.getElementById("paxAccHeader2");
+      if (b2block) b2block.style.display = hasMarker ? "" : "none";
+      if (b2val) {
+        const timeLabel = paxTimeMin === 0 ? "jetzt" : formatStepDisplay(paxTimeMin);
+        b2val.textContent = timeLabel;
+        b2val.className = "pax-acc-value set";
+      }
+      if (b2body) {
+        // Offen wenn: (Zeit ist nächster Schritt = Marker da, Ziel fehlt)
+        // ODER manuell geöffnet (paxTimeOpen)
+        const b2open = hasMarker && (!hasTarget || paxTimeOpen);
+        b2body.classList.toggle("pax-closed", !b2open);
+      }
+      if (b2hdr) b2hdr.classList.toggle("locked", locked);
+
+      // --- Block 3: Ziel ---
+      const b3block = document.getElementById("paxAccBlock3");
+      const b3val   = document.getElementById("paxAccVal3");
+      const b3body  = document.getElementById("paxTargetBlock");
+      const b3hdr   = document.getElementById("paxAccHeader3");
+      if (b3block) b3block.style.display = hasMarker ? "" : "none";
+      if (b3val) {
+        if (hasTarget) {
+          b3val.textContent = "gesetzt ✅";
+          b3val.className = "pax-acc-value set";
+        } else {
+          b3val.textContent = "nicht gesetzt";
+          b3val.className = "pax-acc-value";
+        }
+      }
+      if (b3body) {
+        // Offen wenn: Marker gesetzt, Ziel noch nicht gesetzt, ODER Ziel-Modus aktiv
+        const b3open = hasMarker && (!hasTarget || paxTargetMode);
+        b3body.classList.toggle("pax-closed", !b3open);
+      }
+      if (b3hdr) b3hdr.classList.toggle("locked", locked);
+
+      // --- Block 4: Such-Block ---
+      const searchBlockEl = document.getElementById("paxSearchBlock");
+      if (searchBlockEl) {
+        searchBlockEl.style.display = (hasMarker && hasTarget) ? "" : "none";
+      }
+    }
+
+    // ── Accordion-Header-Klick-Handler (einmal beim Start registrieren) ──
+    function initAccordionHandlers() {
+      // Header 1: Treffpunkt → Marker-Modus aktivieren
+      document.getElementById("paxAccHeader1")?.addEventListener("click", () => {
+        if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        // Body aufklappen durch Marker-Modus einschalten
+        if (!paxMarkerMode) {
+          exitPaxTargetMode();
+          paxMarkerMode = true;
+          const btn = document.getElementById("btnPaxMarker");
+          if (btn) btn.classList.add("active-pax");
+          showHint("Treffpunkt auf der Karte setzen oder verschieben.");
+        } else {
+          // Nochmal klicken → Modus beenden, Body bleibt wenn Marker fehlt
+          exitPaxMarkerMode();
+          hideHint();
+        }
+        updatePaxUI();
+      });
+
+      // Header 2: Startzeit → paxTimeOpen togglen, aktueller Wert bleibt erhalten
+      document.getElementById("paxAccHeader2")?.addEventListener("click", () => {
+        if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        paxTimeOpen = !paxTimeOpen;
+        updatePaxUI();
+      });
+
+      // Header 3: Ziel → Ziel-Modus aktivieren
+      document.getElementById("paxAccHeader3")?.addEventListener("click", () => {
+        if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        if (!paxTargetMode) {
+          exitPaxMarkerMode();
+          paxTargetMode = true;
+          const btn = document.getElementById("btnPaxTarget");
+          if (btn) btn.classList.add("active-pax");
+          showHint("Ziel auf der Karte antippen.");
+        } else {
+          exitPaxTargetMode();
+          hideHint();
+        }
+        updatePaxUI();
+      });
+    }
+
+    // clearManualOpen als No-Op erhalten (cancelPaxSearch ruft es auf)
+    function clearManualOpen() {}
+
+    // GPS-Standort → Marker setzen (aktiviert keinen Verschiebe-Modus)
+    document.getElementById("btnPaxGps")?.addEventListener("click", () => {
+      if (!navigator.geolocation) return showHint("GPS nicht verfügbar.");
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const { longitude: lng, latitude: lat } = pos.coords;
+          paxHasGps = true;                    // GPS-Verifikation gesetzt
+          exitPaxMarkerMode();               // Marker-Modus beenden (GPS = kein manueller Modus)
+          setPaxMarkerPos(lng, lat, true);   // fromGps=true → paxHasGps bleibt true
+          map.easeTo({ center: [lng, lat], zoom: 15, duration: 600 });
+          updatePaxUI();              // Such-Button entsperren
+        },
+        err => showHint("GPS-Fehler: " + err.message)
+      );
+    });
+
+    // Marker per Kartenklick setzen
+    document.getElementById("btnPaxMarker")?.addEventListener("click", () => {
+      if (paxMarkerMode) {
+        // Modus beenden
+        paxMarkerMode = false;
+        document.getElementById("btnPaxMarker").classList.remove("active-pax");
+        showHint("");
+        updatePaxUI();
+        return;
+      }
+      // Marker-Modus aktivieren – Ziel-Modus beenden falls aktiv
+      exitPaxTargetMode();
+      paxMarkerMode = true;
+      document.getElementById("btnPaxMarker").classList.add("active-pax");
+      showHint("Auf Karte tippen um Treffpunkt zu setzen.");
+      updatePaxUI(); // Draggability sofort aktivieren
+    });
+
+    // ─────────────────────────────────────────────────
+    // ZEITFENSTER-STEPPER
+    // ─────────────────────────────────────────────────
+    const PAX_STEP_MIN  = 0;    // frühester Wert: jetzt
+    const PAX_STEP_MAX  = 180;  // spätester Wert: 3 Std
+
+    function formatStepDisplay(min) {
+      if (min === null) return "–";
+      if (min === 0)   return "jetzt";
+      if (min < 60)    return `${min} Min`;
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return m === 0 ? `${h} Std` : `${h} Std ${m}`;
+    }
+
+    function getStepSize(holdMs) {
+      if (holdMs < 1000) return 5;
+      if (holdMs < 2000) return 10;
+      return 15;
+    }
+
+    function applyStep(delta) {
+      const current = paxTimeMin ?? 0;
+      const next = Math.max(PAX_STEP_MIN, Math.min(PAX_STEP_MAX, current + delta));
+      if (next === paxTimeMin) return;
+      paxTimeMin = next;
+      updatePaxUI();
+    }
+
+    function syncStepperUI() {
+      const display  = document.getElementById("paxStepDisplay");
+      const btnMinus = document.getElementById("btnStepMinus");
+      const btnPlus  = document.getElementById("btnStepPlus");
+      const locked   = paxSearchActive || isPaxInputLocked();
+      if (display)  display.textContent = formatStepDisplay(paxTimeMin);
+      if (btnMinus) btnMinus.disabled = locked || paxTimeMin === PAX_STEP_MIN;
+      if (btnPlus)  btnPlus.disabled  = locked || paxTimeMin === PAX_STEP_MAX;
+    }
+
+    // Hold-to-accelerate Logik
+    function makeStepperHold(sign) {
+      let holdTimer  = null;
+      let holdStart  = 0;
+      let intervalId = null;
+
+      function stop() {
+        if (intervalId) { clearInterval(intervalId); intervalId = null; }
+        if (holdTimer)  { clearTimeout(holdTimer);   holdTimer  = null; }
+      }
+
+      function tick() {
+        const holdMs = Date.now() - holdStart;
+        applyStep(sign * getStepSize(holdMs));
+      }
+
+      function start(e) {
+        e.preventDefault();
+        if (paxSearchActive || isPaxInputLocked()) return;
+        holdStart = Date.now();
+        // Sofortiger erster Schritt
+        applyStep(sign * 5);
+        // Nach 400ms beginnt kontinuierlicher Tick
+        holdTimer = setTimeout(() => {
+          intervalId = setInterval(tick, 180);
+        }, 400);
+      }
+
+      return { start, stop };
+    }
+
+    const stepMinus = makeStepperHold(-1);
+    const stepPlus  = makeStepperHold(+1);
+
+    const btnStepMinus = document.getElementById("btnStepMinus");
+    const btnStepPlus  = document.getElementById("btnStepPlus");
+
+    if (btnStepMinus) {
+      btnStepMinus.addEventListener("mousedown",   stepMinus.start);
+      btnStepMinus.addEventListener("touchstart",  stepMinus.start, { passive: false });
+      btnStepMinus.addEventListener("mouseup",     stepMinus.stop);
+      btnStepMinus.addEventListener("mouseleave",  stepMinus.stop);
+      btnStepMinus.addEventListener("touchend",    stepMinus.stop);
+      btnStepMinus.addEventListener("touchcancel", stepMinus.stop);
+    }
+    if (btnStepPlus) {
+      btnStepPlus.addEventListener("mousedown",   stepPlus.start);
+      btnStepPlus.addEventListener("touchstart",  stepPlus.start, { passive: false });
+      btnStepPlus.addEventListener("mouseup",     stepPlus.stop);
+      btnStepPlus.addEventListener("mouseleave",  stepPlus.stop);
+      btnStepPlus.addEventListener("touchend",    stepPlus.stop);
+      btnStepPlus.addEventListener("touchcancel", stepPlus.stop);
+    }
+
+    // ─────────────────────────────────────────────────
+    // MITFAHRER-SUCHE: MATCHING
+    // ─────────────────────────────────────────────────
+
+    // Haversine-Distanz in km
+    function haversineKm(lat1, lng1, lat2, lng2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2
+              + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // Prüft ob ein Fahrer grob in Richtung Zielgebiet fährt
+    // (letzte 2 Routenpunkte → Richtungsvektor)
+    // Prüft ob Fahrer grob in Richtung Zielmarker fährt (Dot-Produkt)
+    function driverHeadsTowardTarget(driverKey) {
+      if (paxTargetLat === null || paxTargetLng === null) return true;
+      const wantDLng = paxTargetLng - paxLng;
+      const wantDLat = paxTargetLat - paxLat;
+      if (Math.abs(wantDLng) < 0.001 && Math.abs(wantDLat) < 0.001) return true;
+      const pts = routePoints.get(driverKey);
+      if (!pts || pts.length < 2) return true;
+      const p1 = pts[pts.length - 2];
+      const p2 = pts[pts.length - 1];
+      const drivDLng = p2.lng - p1.lng;
+      const drivDLat = p2.lat - p1.lat;
+      if (Math.abs(drivDLng) < 0.00005 && Math.abs(drivDLat) < 0.00005) return true;
+      return (wantDLng * drivDLng + wantDLat * drivDLat) >= 0;
+    }
+
+    // ─── Cooldown-Helfer ───
+    function startPaxCooldown() {
+      if (paxCooldownTimer) { clearInterval(paxCooldownTimer); paxCooldownTimer = null; }
+      paxCooldownUntil = Date.now() + PAX_COOLDOWN_MS;
+      const statusEl = document.getElementById("paxMatchStatus");
+      paxCooldownTimer = setInterval(() => {
+        const remaining = Math.ceil((paxCooldownUntil - Date.now()) / 1000);
+        if (remaining <= 0) {
+          clearInterval(paxCooldownTimer);
+          paxCooldownTimer = null;
+          // Cooldown abgelaufen → UI entsperren
+          updatePaxUI();
+          if (statusEl && statusEl.classList.contains("cooldown")) {
+            statusEl.className = "pax-match-status";
+            statusEl.textContent = "";
+          }
+        } else {
+          if (statusEl) {
+            statusEl.textContent = `Bitte kurz warten… noch ${remaining}s`;
+            statusEl.className = "pax-match-status show cooldown";
+          }
+          updatePaxUI(); // Button+Zeitfenster gesperrt halten
+        }
+      }, 500);
+    }
+
+    function isPaxRateLimited() {
+      const now = Date.now();
+      // Alte Einträge außerhalb des Zeitfensters bereinigen
+      while (paxStartTimes.length && now - paxStartTimes[0] > PAX_MAX_WINDOW_MS) {
+        paxStartTimes.shift();
+      }
+      // Bereits >= MAX_STARTS im Fenster → gesperrt
+      return paxStartTimes.length >= PAX_MAX_STARTS;
+    }
+
+    function runPaxSearch() {
+      if (!map || paxLat === null || paxLng === null) return;
+      if (paxTargetLat === null || paxTargetLng === null) return;
+      if (isPaxInputLocked()) return;
+
+      if (isPaxRateLimited()) {
+        const statusEl = document.getElementById("paxMatchStatus");
+        if (statusEl) { statusEl.textContent = "Zu viele Neustarts – bitte kurz warten."; statusEl.className = "pax-match-status show cooldown"; }
+        startPaxCooldown();
+        return;
+      }
+
+      paxStartTimes.push(Date.now());
+      const now = Date.now();
+      paxMatchedKeys.clear();
+
+      for (const [driverKey, pos] of positions.entries()) {
+        if (endedDrivers.has(driverKey)) continue;
+        if (now - (pos.ts || 0) > STALE_MS) continue;
+        const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
+        if (distKm > PAX_MATCH_RADIUS_KM + paxTimeMin * 0.5) continue;
+        if (!driverHeadsTowardTarget(driverKey)) continue;
+        paxMatchedKeys.add(driverKey);
+      }
+
+      paxSearchActive = true;
+      refreshPaxMatchLayer();
+      updatePaxUI();
+
+      const statusEl = document.getElementById("paxMatchStatus");
+      if (statusEl) {
+        if (paxMatchedKeys.size > 0) {
+          statusEl.textContent = `${paxMatchedKeys.size} passende${paxMatchedKeys.size === 1 ? "r" : ""} Fahrer gefunden ✅`;
+          statusEl.className = "pax-match-status show found";
+        } else {
+          statusEl.textContent = "Keine passenden Fahrer in der Nähe.";
+          statusEl.className = "pax-match-status show none";
+        }
+      }
+    }
+
+    function cancelPaxSearch() {
+      paxSearchActive = false;
+      paxTimeOpen = false;
+      paxMatchedKeys.clear();
+      clearManualOpen();
+      refreshPaxMatchLayer();
+      updatePaxUI();
+      const statusEl = document.getElementById("paxMatchStatus");
+      if (statusEl) { statusEl.textContent = ""; statusEl.className = "pax-match-status"; }
+      // Cooldown NUR hier starten – Eingabephase (Zeitfenster, Zieltext) bleibt frei
+      startPaxCooldown();
+    }
+
+    // Highlight-Layer auf der Karte aktualisieren
+    function refreshPaxMatchLayer() {
+      if (!map || !map.getSource(PAX_MATCH_SOURCE)) return;
+      const features = [];
+      if (paxSearchActive) {
+        for (const [driverKey, pos] of positions.entries()) {
+          if (!paxMatchedKeys.has(driverKey)) continue;
+          features.push({
+            type: "Feature",
+            properties: { driverKey },
+            geometry: { type: "Point", coordinates: [pos.lng, pos.lat] }
+          });
+        }
+      }
+      map.getSource(PAX_MATCH_SOURCE).setData({ type: "FeatureCollection", features });
+    }
+
+    // Such-Buttons
+    document.getElementById("btnPaxSearch")?.addEventListener("click", () => runPaxSearch());
+    document.getElementById("btnPaxCancel")?.addEventListener("click", () => cancelPaxSearch());
+
+    // ─────────────────────────────────────────────────
+    // UTILS
+    // ─────────────────────────────────────────────────
+    function debounce(fn, waitMs) {
+      let t = null;
+      return (...args) => { if (t) clearTimeout(t); t = setTimeout(() => fn(...args), waitMs); };
+    }
+    function normalizeCutoff(cutoffOverride, fallbackIso) {
+      if (!cutoffOverride) return fallbackIso;
+      if (typeof cutoffOverride === "number") return new Date(cutoffOverride).toISOString();
+      return String(cutoffOverride);
+    }
+    function normId(v) { return String(v ?? "").trim().toLowerCase(); }
+    function getColorForDriver(driverKey) {
+      let hash = 0;
+      for (let i = 0; i < driverKey.length; i++) hash = driverKey.charCodeAt(i) + ((hash << 5) - hash);
+      return ROUTE_COLORS[Math.abs(hash) % ROUTE_COLORS.length];
+    }
+    function isPanelOpen() {
+      const p = document.querySelector(".panel");
+      return p && !p.classList.contains("collapsed");
+    }
+    function isTabVisible() { return document.visibilityState === "visible"; }
+    function shouldPollImpact() { return isPanelOpen() && isTabVisible(); }
+    function showHint(msg) {
+      if (!isPanelOpen()) return;
+      const el = document.getElementById("hintInline");
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+    function hideHint() {
+      const el = document.getElementById("hintInline");
+      if (!el) return;
+      el.classList.remove("show");
+      el.textContent = "";
+    }
+    function setRealtimeState(state) {
+      const dot = document.getElementById("rtDot");
+      const txt = document.getElementById("rtTxt");
+      if (dot) dot.classList.toggle("on", state === "AN");
+      if (txt) txt.textContent = "Realtime: " + (state === "AN" ? "AN" : state === "RECONNECT" ? "RECONNECT" : "AUS");
+    }
+    function setLast(ts = new Date()) { setSafeTextContent("lastTxt", ts.toLocaleString("de-DE")); }
+    function setCount(n) { setSafeTextContent("countTxt", "Marker: " + n); }
+    function setSync(on) {
+      const el = document.getElementById("syncIcon");
+      if (el) el.classList.toggle("on", !!on);
+    }
+    function pulse(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 420);
+    }
+    function formatAge(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return `vor ${s} Sek.`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `vor ${m} Min.`;
+      const h = Math.floor(m / 60);
+      if (h < 48) return `vor ${h} Std.`;
+      return `vor ${Math.floor(h / 24)} Tg.`;
+    }
+    async function copyText(text) {
+      try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; } } catch (_) {}
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        const ok = document.execCommand("copy"); ta.remove(); return ok;
+      } catch (_) { return false; }
+    }
+    function isValidLatLng(lat, lng) {
+      return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    }
+    function validateConfigOrFail() {
+      if (!CONFIG?.mapboxToken || !String(CONFIG.mapboxToken).startsWith("pk.")) {
+        showHint("Mapbox Token fehlt."); return false;
+      }
+      if (!/^https?:\/\/.+/i.test(String(CONFIG?.supabaseUrl || ""))) {
+        showHint("Supabase URL ungültig."); return false;
+      }
+      if (!CONFIG?.supabaseAnonKey || String(CONFIG.supabaseAnonKey).length < 20) {
+        showHint("Supabase Key fehlt."); return false;
+      }
+      return true;
+    }
+    function getBoundsBBoxPadded() {
+      if (!map) return null;
+      const b = map.getBounds();
+      if (!b) return null;
+      const w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
+      const dx = (e - w) * BBOX_PAD_FACTOR, dy = (n - s) * BBOX_PAD_FACTOR;
+      return { west: w - dx, south: s - dy, east: e + dx, north: n + dy };
+    }
+    function isInBbox(bb, lng, lat) {
+      if (!bb) return true;
+      return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north;
+    }
+
+    // ─────────────────────────────────────────────────
+    // DRIVER SOURCE
+    // ─────────────────────────────────────────────────
+    function updateSelectedLayerFilter() {
+      if (!map || !map.getLayer(LAYER_POINTS_SELECTED)) return;
+      map.setFilter(LAYER_POINTS_SELECTED,
+        currentFilterKey
+          ? ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], currentFilterKey]]
+          : ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], "__none__"]]
+      );
+    }
+    function refreshDriversSource() {
+      if (!map || !map.getSource(DRIVERS_SOURCE)) return;
+      const feats = [];
+      const now = Date.now();
+      const bb = currentFilterKey ? null : getBoundsBBoxPadded();
+      for (const [driverKey, p] of positions.entries()) {
+        if (!p) continue;
+        if (endedDrivers.has(driverKey)) continue;
+        if (currentFilterKey && driverKey !== currentFilterKey) continue;
+        if (!currentFilterKey && bb && !isInBbox(bb, Number(p.lng), Number(p.lat))) continue;
+        // Bug 3: Aktive-Modus = nur Fahrer mit aktiver Fahrt in activeRides
+        if (activeOnlyMode && !currentFilterKey) {
+          const hasRide = [...activeRides.values()].some(r => normId(r.driver_id) === driverKey);
+          if (!hasRide) continue;
+        }
+        const stale = (now - (p.ts || now)) > STALE_VISUAL_MS;
+        feats.push({
+          type: "Feature",
+          properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0 },
+          geometry: { type: "Point", coordinates: [p.lng, p.lat] }
+        });
+      }
+      map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
+      updateSelectedLayerFilter();
+      setCount(feats.length);
+      setSafeTextContent("impactMarkers", String(feats.length));
+      pulse("impactMarkers");
+      // Mitfahrer-Suche: Highlight nach Positions-Update synchron halten
+      if (paxSearchActive) refreshPaxMatchLayer();
+    }
+
+    // ─────────────────────────────────────────────────
+    // NEU: RIDES SOURCE (Ziel-Punkte + Routen-Linien)
+    // ─────────────────────────────────────────────────
+    function refreshRidesSource() {
+      if (!map || !map.getSource(RIDES_SOURCE)) return;
+
+      const destFeatures  = [];
+      const routeFeatures = [];
+
+      for (const [rideId, ride] of activeRides.entries()) {
+        const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
+        if (!isValidLatLng(zLat, zLng)) continue;
+
+        const props = {
+          rideId,
+          driverId:   ride.driver_id || "",
+          fahrerName: ride.fahrer_name || ride.driver_id || "",
+          plaetze:    ride.plaetze ?? 2,
+          preis:      Number(ride.preis ?? 0),
+          bewertung:  ride.fahrer_bewertung !== null && ride.fahrer_bewertung !== undefined
+                        ? Number(ride.fahrer_bewertung) : null,
+          fahrerLat:  Number(ride.fahrer_lat),
+          fahrerLng:  Number(ride.fahrer_lng),
+        };
+
+        // ── Ziel-Punkt (orange) ──
+        destFeatures.push({
+          type: "Feature",
+          properties: props,
+          geometry: { type: "Point", coordinates: [zLng, zLat] }
+        });
+
+        // ── Routen-Linie: route_punkte (JSONB) oder Fallback Start→Ziel ──
+        let coords = null;
+        try {
+          const raw = ride.route_punkte;
+          if (Array.isArray(raw) && raw.length >= 2) {
+            const pts = raw
+              .map(p => [Number(p.lng ?? p.lon ?? p[0]), Number(p.lat ?? p[1])])
+              .filter(([lng, lat]) => isValidLatLng(lat, lng));
+            if (pts.length >= 2) coords = pts;
+          }
+        } catch (_) {}
+
+        // Fallback: Fahrer-Startposition → Ziel (2 Punkte)
+        if (!coords) {
+          const fLat = Number(ride.fahrer_lat), fLng = Number(ride.fahrer_lng);
+          if (isValidLatLng(fLat, fLng)) {
+            coords = [[fLng, fLat], [zLng, zLat]];
+          }
+        }
+
+        if (coords && coords.length >= 2) {
+          routeFeatures.push({
+            type: "Feature",
+            properties: { rideId, driverId: ride.driver_id || "" },
+            geometry: { type: "LineString", coordinates: coords }
+          });
+        }
+      }
+
+      map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: destFeatures });
+
+      if (map.getSource(RIDES_ROUTE_SOURCE)) {
+        map.getSource(RIDES_ROUTE_SOURCE).setData({ type: "FeatureCollection", features: routeFeatures });
+      }
+
+      setSafeTextContent("rideCountTxt", String(destFeatures.length));
+      pulse("rideCountTxt");
+    }
+
+    // ─────────────────────────────────────────────────
+    // DRIVER POPUP (bestehend)
+    // ─────────────────────────────────────────────────
+    function openMarkerPopupFromFeature(feature) {
+      if (!map || !feature) return;
+      if (markerPopup) { markerPopup.remove(); markerPopup = null; }
+      if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
+
+      const props  = feature.properties || {};
+      const rawId  = props.rawId || props.driverKey || "";
+      const ts     = Number(props.ts) || Date.now();
+      const ageMs  = Date.now() - ts;
+      const isStale = ageMs > STALE_VISUAL_MS;
+
+      const root   = document.createElement("div");
+      const title  = document.createElement("div");
+      title.className = "er-pop-title";
+      title.innerHTML = `<span>Fahrer</span><span class="er-badge ${isStale ? "stale" : "ok"}">${isStale ? "Stale" : "Aktiv"}</span>`;
+
+      const sub = document.createElement("div");
+      sub.className = "er-pop-sub";
+      sub.innerHTML = `<span style="font-weight:700">${rawId}</span><span>${formatAge(ageMs)}</span>`;
+
+      const actions = document.createElement("div");
+      actions.className = "er-pop-actions";
+
+      const btnRoute = document.createElement("button");
+      btnRoute.className = "er-pop-btn primary"; btnRoute.type = "button"; btnRoute.textContent = "Route anzeigen";
+
+      const btnCopy = document.createElement("button");
+      btnCopy.className = "er-pop-btn"; btnCopy.type = "button"; btnCopy.textContent = "Kopieren";
+
+      actions.appendChild(btnRoute);
+      actions.appendChild(btnCopy);
+      root.appendChild(title);
+      root.appendChild(sub);
+      root.appendChild(actions);
+
+      btnRoute.addEventListener("click", async (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        if (!routesVisible) {
+          routesVisible = true;
+          if (map.getLayer("er-routes-line")) map.setLayoutProperty("er-routes-line", "visibility", "visible");
+          const b = document.getElementById("btnToggleRoutes");
+          if (b) b.textContent = "Ausblenden";
+        }
+        const df = document.getElementById("driverFilter");
+        if (df) df.value = rawId;
+        currentFilter = String(rawId).trim();
+        currentFilterKey = normId(currentFilter);
+        updateSelectedLayerFilter();
+        const c = feature.geometry?.coordinates;
+        if (Array.isArray(c) && c.length === 2) map.easeTo({ center: c, zoom: 14, duration: 550 });
+        await fetchLatest().catch(() => {});
+        await fetchRouteHistory().catch(() => {});
+        refreshDriversSource();
+        onVisibilityOrPanelChange();
+      });
+      btnCopy.addEventListener("click", async (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        const ok = await copyText(String(rawId));
+        showHint(ok ? "Driver ID kopiert." : "Kopieren nicht möglich.");
+        setTimeout(() => hideHint(), 1200);
+      });
+
+      const coords = feature.geometry?.coordinates;
+      if (!Array.isArray(coords) || coords.length !== 2) return;
+      markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
+        .setLngLat(coords).setDOMContent(root).addTo(map);
+    }
+
+    // ─────────────────────────────────────────────────
+    // NEU: RIDE POPUP (Mitfahrer-Anfrage)
+    // ─────────────────────────────────────────────────
+    function openRidePopup(feature) {
+      if (!map || !feature) return;
+      if (markerPopup) { markerPopup.remove(); markerPopup = null; }
+      if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
+
+      const props     = feature.properties || {};
+      const rideId    = props.rideId;
+      const driverId  = props.driverId  || "";
+      const fahrerName = props.fahrerName || driverId;
+      const plaetze   = props.plaetze   ?? 2;
+      const preis     = Number(props.preis ?? 0);
+      const bewertung = (props.bewertung !== null && props.bewertung !== undefined && props.bewertung !== "null")
+                          ? Number(props.bewertung) : null;
+      const fahrerLat = Number(props.fahrerLat);
+      const fahrerLng = Number(props.fahrerLng);
+
+      const root = document.createElement("div");
+
+      // Titel
+      const title = document.createElement("div");
+      title.className = "er-pop-title";
+      title.innerHTML = `<span>🚗 Fahrt verfügbar</span><span class="er-badge ride">AKTIV</span>`;
+      root.appendChild(title);
+
+      // Fahrer-Sub
+      const sub = document.createElement("div");
+      sub.className = "er-pop-sub";
+      sub.innerHTML = `<span style="font-weight:700">${fahrerName}</span><span>${bewertung !== null ? "⭐ " + bewertung.toFixed(1) : ""}</span>`;
+      root.appendChild(sub);
+
+      // Details
+      const details = document.createElement("div");
+      details.className = "er-pop-details";
+      details.innerHTML = `<span>💺 ${plaetze} Platz/Plätze</span><span>💶 ${preis.toFixed(2)} €</span>`;
+      root.appendChild(details);
+
+      // Trennlinie
+      const hr = document.createElement("hr");
+      hr.className = "er-pop-divider";
+      root.appendChild(hr);
+
+      // Name-Input
+      const storedName = localStorage.getItem("er_mitfahrer_name") || "";
+      const nameInput = document.createElement("input");
+      nameInput.className = "er-pop-input";
+      nameInput.placeholder = "Dein Name für die Anfrage";
+      nameInput.value = storedName;
+      root.appendChild(nameInput);
+
+      // Status
+      const statusEl = document.createElement("div");
+      statusEl.className = "er-pop-status";
+      root.appendChild(statusEl);
+
+      function setStatus(msg, isErr = false) {
+        statusEl.textContent = msg;
+        statusEl.className = "er-pop-status " + (isErr ? "err" : "ok");
+      }
+      function clearStatus() {
+        statusEl.textContent = "";
+        statusEl.className = "er-pop-status";
+      }
+
+      // Buttons
+      const actions = document.createElement("div");
+      actions.className = "er-pop-actions";
+
+      const btnGeo = document.createElement("button");
+      btnGeo.className = "er-pop-btn secondary";
+      btnGeo.type = "button";
+      btnGeo.textContent = "📍 Standort";
+
+      const btnAnfragen = document.createElement("button");
+      btnAnfragen.className = "er-pop-btn primary";
+      btnAnfragen.type = "button";
+      btnAnfragen.textContent = "Anfragen →";
+
+      actions.appendChild(btnGeo);
+      actions.appendChild(btnAnfragen);
+      root.appendChild(actions);
+
+      // Pickup-State – Fallback: Fahrerposition
+      let pickupLat = isValidLatLng(fahrerLat, fahrerLng) ? fahrerLat : null;
+      let pickupLng = isValidLatLng(fahrerLat, fahrerLng) ? fahrerLng : null;
+      let geoReady  = false;
+
+      // Geo-Button
+      btnGeo.addEventListener("click", (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        if (!navigator.geolocation) { setStatus("GPS nicht verfügbar.", true); return; }
+        btnGeo.textContent = "…";
+        btnGeo.disabled = true;
+        clearStatus();
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            pickupLat = pos.coords.latitude;
+            pickupLng = pos.coords.longitude;
+            geoReady  = true;
+            btnGeo.textContent = "✅ Standort";
+            btnGeo.disabled = false;
+            setStatus(`Abholpunkt gesetzt ✅`);
+          },
+          err => {
+            btnGeo.textContent = "📍 Standort";
+            btnGeo.disabled = false;
+            setStatus("GPS-Fehler: " + err.message, true);
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      });
+
+      // Anfragen-Button
+      btnAnfragen.addEventListener("click", async (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        const name = nameInput.value.trim();
+        if (!name) { setStatus("Bitte Namen eingeben.", true); return; }
+        if (pickupLat === null || pickupLng === null) {
+          setStatus("Bitte zuerst Standort bestimmen.", true); return;
+        }
+        btnAnfragen.disabled = true;
+        btnAnfragen.textContent = "Sende…";
+        clearStatus();
+        try {
+          localStorage.setItem("er_mitfahrer_name", name);
+          await submitRequest(rideId, pickupLat, pickupLng, name);
+          setStatus("Anfrage gesendet! Der Fahrer wird informiert. ✅");
+          btnAnfragen.textContent = "Gesendet ✅";
+        } catch (e) {
+          logError("ERR_SUBMIT_REQUEST", e.message);
+          setStatus("Fehler: " + e.message, true);
+          btnAnfragen.disabled = false;
+          btnAnfragen.textContent = "Anfragen →";
+        }
+      });
+
+      const coords = feature.geometry?.coordinates;
+      if (!Array.isArray(coords) || coords.length !== 2) return;
+
+      ridePopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14, maxWidth: "270px" })
+        .setLngLat(coords).setDOMContent(root).addTo(map);
+    }
+
+    // ─────────────────────────────────────────────────
+    // NEU: MITFAHRER USER (localStorage-basiert)
+    // ─────────────────────────────────────────────────
+    async function getOrCreateMitfahrer(name) {
+      if (mitfahrerId) return mitfahrerId;
+      const { data, error } = await sb
+        .from("users")
+        .insert({ name: name.trim(), rolle: "mitfahrer" })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      mitfahrerId = data.id;
+      localStorage.setItem("er_mitfahrer_id", mitfahrerId);
+      return mitfahrerId;
+    }
+
+    async function submitRequest(rideId, pickupLat, pickupLng, name) {
+      const uid = await getOrCreateMitfahrer(name);
+      const { error } = await sb.from("requests").insert({
+        mitfahrer_id: uid,
+        ride_id:      rideId,
+        pickup_lat:   pickupLat,
+        pickup_lng:   pickupLng,
+        status:       "offen",
+      });
+      if (error) throw new Error(error.message);
+    }
+
+    // ─────────────────────────────────────────────────
+    // IMPACT POLLING
+    // ─────────────────────────────────────────────────
+    function clearImpactTimer() { if (impactTimer) { clearTimeout(impactTimer); impactTimer = null; } }
+    function scheduleImpactPoll(immediate = false) {
+      clearImpactTimer();
+      if (!shouldPollImpact()) return;
+      const nextMs = immediate ? IMPACT_MIN_MS : Math.max(IMPACT_OK_MS, IMPACT_BACKOFF[impactBackoffIdx] ?? IMPACT_MAX_MS);
+      impactTimer = setTimeout(() => { fetchImpactOnce().catch(() => {}); }, nextMs);
+    }
+    function onVisibilityOrPanelChange() {
+      if (shouldPollImpact()) { fetchImpactOnce().catch(() => {}); scheduleImpactPoll(false); }
+      else clearImpactTimer();
+    }
+    // Timestamp letzten manuellen Ride-Endes – Impact-RPC für 3 Min. übersteuern
+    let manualEndedAt = 0;
+    let manualEndedDriverKey = null; // driverKey des manuell beendeten Fahrers
+
+    // Sofortiger Reset der Impact-Anzeige bei manuellem Ride-Ende
+    function resetImpactCounters(driverKey) {
+      manualEndedAt = Date.now();
+      if (driverKey) {
+        manualEndedDriverKey = driverKey;
+        recentlyEnded.add(driverKey);
+      }
+      // Timer stoppen damit kein Poll den Wert sofort überschreibt
+      clearImpactTimer();
+      const rideCount   = activeRides.size;
+      setSafeTextContent("impactActive",   String(getActiveDriverCount()));
+      setSafeTextContent("impactPoints10", "0");
+      setSafeTextContent("impactMarkers",  String(positions.size));
+      setSafeTextContent("rideCountTxt",   String(rideCount));
+      pulse("impactActive");
+      // Erst nach 3 Min. wieder pollen (DB-Zeitfenster abgelaufen)
+      setTimeout(() => {
+        manualEndedAt = 0;
+        manualEndedDriverKey = null;
+        if (driverKey) recentlyEnded.delete(driverKey);
+        scheduleImpactPoll();
+      }, 3 * 60_000);
+    }
+
+    async function fetchImpactOnce() {
+      if (!shouldPollImpact() || impactInFlight) return;
+
+      // Nach manuellem Ride-Ende: 3 Min. lang positions.size verwenden statt DB-Wert
+      // (DB-Zeitfenster zählt noch 2 Min. lang alte GPS-Punkte)
+      const sinceManualEnd = Date.now() - manualEndedAt;
+      if (manualEndedAt > 0 && sinceManualEnd < 3 * 60_000) {
+        setSafeTextContent("impactActive", String(getActiveDriverCount()));
+        setSafeTextContent("impactMarkers", String(positions.size));
+        scheduleImpactPoll();
+        return;
+      }
+
+      impactInFlight = true; setSync(true);
+      try {
+        const { data, error } = await sb.rpc("get_live_impact", { active_minutes: 2, points_minutes: 10 });
+        if (error) throw new Error(error.message);
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) throw new Error("RPC returned no rows");
+        setSafeTextContent("impactActive",   String(getActiveDriverCount()));
+        setSafeTextContent("impactPoints10", String(row.points_window  ?? 0));
+        pulse("impactActive"); pulse("impactPoints10");
+        lastImpactOkAt = Date.now(); impactBackoffIdx = 0; setLast(new Date());
+      } catch (e) {
+        logError("ERR_RPC_IMPACT", e?.message || String(e));
+        showHint("Impact temporär nicht verfügbar.");
+        impactBackoffIdx = Math.min(impactBackoffIdx + 1, IMPACT_BACKOFF.length - 1);
+      } finally { impactInFlight = false; setSync(false); }
+      scheduleImpactPoll();
+    }
+
+    // ─────────────────────────────────────────────────
+    // ROUTES SOURCE
+    // ─────────────────────────────────────────────────
+    function refreshRoutesSource() {
+      if (!map || !routesReady || !map.getSource("er-routes")) return;
+      const features = [];
+      for (const [driverKey, pts] of routePoints.entries()) {
+        if (!pts || pts.length < 2) continue;
+        if (currentFilterKey && driverKey !== currentFilterKey) continue;
+        features.push({
+          type: "Feature",
+          properties: { driverKey, color: getColorForDriver(driverKey) },
+          geometry: { type: "LineString", coordinates: pts.map(p => [p.lng, p.lat]) }
+        });
+      }
+      map.getSource("er-routes").setData({ type: "FeatureCollection", features });
+      if (!isPanelOpen()) return;
+      if (features.length === 0 && currentFilterKey) showHint("Keine Route für diesen Fahrer.");
+      else if (features.length === 0) showHint("Keine Routen verfügbar.");
+      else hideHint();
+    }
+
+    // ─────────────────────────────────────────────────
+    // MAPBOX INIT
+    // ─────────────────────────────────────────────────
+    function initMapbox() {
+      mapboxgl.accessToken = CONFIG.mapboxToken;
+      const m = new mapboxgl.Map({
+        container: "map",
+        style: nightMode ? NIGHT_STYLE : DAY_STYLE,
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+      });
+      // NavigationControl bewusst entfernt: Mobile nutzt Pinch-to-Zoom
+
+      m.on("load", () => {
+        hideHint();
+        initMapboxLayers(m);
+        refreshDriversSource();
+        refreshRoutesSource();
+        refreshRidesSource();
+      });
+
+      m.on("error", (e) => {
+        logError("ERR_MAPBOX", "Mapbox error", { err: e?.error || e });
+        showHint("Karte konnte nicht geladen werden.");
+      });
+      return m;
+    }
+
+    // ─────────────────────────────────────────────────
+    // FETCH: LATEST POSITIONS
+    // ─────────────────────────────────────────────────
+    async function fetchLatest(cutoffOverride) {
+      const seq = ++latestFetchSeq;
+      const now = Date.now();
+      // Bug 3: immer STALE_MS als Fetch-Cutoff – activeOnlyMode filtert client-seitig via activeRides
+      const fallbackIso = new Date(now - STALE_MS).toISOString();
+      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
+
+      if (currentFilterKey) {
+        const idExact = String(currentFilter || "").trim();
+        if (!idExact) return;
+        const { data, error } = await sb.from("v_live_positions_latest")
+          .select("driver_id,lat,lng,updated_at").ilike("driver_id", idExact)
+          .gte("updated_at", cutoffIso).limit(1);
+        if (seq !== latestFetchSeq) return;
+        if (error) { logError("ERR_FETCH_LATEST_FOLLOW_V", error.message); showHint("Fehler beim Laden."); return; }
+        const row = data?.[0] ?? null;
+        if (!row) { showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
+        const rawId = (row.driver_id ?? "").toString();
+        const driverKey = normId(rawId);
+        if (endedDrivers.has(driverKey)) {
+          positions.clear();
+          refreshDriversSource();
+          return;
+        }
+        const lat = Number(row.lat), lng = Number(row.lng);
+        if (!isValidLatLng(lat, lng)) return;
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (Date.now() - ts > STALE_MS) return;
+        positions.clear();
+        positions.set(driverKey, { rawId, lng, lat, ts });
+        map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
+        setLast(new Date()); refreshDriversSource();
+        return;
+      }
+
+      const bb = getBoundsBBoxPadded();
+      if (!bb) return;
+      const { data, error } = await sb.from("v_live_positions_latest")
+        .select("driver_id,lat,lng,updated_at").gte("updated_at", cutoffIso)
+        .gte("lat", bb.south).lte("lat", bb.north).gte("lng", bb.west).lte("lng", bb.east)
+        .limit(BBOX_LIMIT_LATEST);
+      if (seq !== latestFetchSeq) return;
+      if (error) { logError("ERR_FETCH_LATEST_BBOX_V", error.message); showHint("Fehler beim Laden."); return; }
+      positions.clear();
+      for (const row of data || []) {
+        const rawId = (row?.driver_id ?? "").toString();
+        const key = normId(rawId); if (!key) continue;
+        if (endedDrivers.has(key)) continue;
+        const lat = Number(row.lat), lng = Number(row.lng);
+        if (!isValidLatLng(lat, lng)) continue;
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (Date.now() - ts > STALE_MS) continue;
+        positions.set(key, { rawId: row.driver_id, lng, lat, ts });
+      }
+      setLast(new Date()); refreshDriversSource();
+    }
+
+    // ─────────────────────────────────────────────────
+    // FETCH: ROUTE HISTORY
+    // ─────────────────────────────────────────────────
+    async function fetchRouteHistory(cutoffOverride) {
+      const seq = ++routeFetchSeq;
+      const now = Date.now();
+      const fallbackIso = new Date(now - (activeOnlyMode ? ACTIVE_ONLY_MS : ROUTE_MS)).toISOString();
+      const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
+      routePoints.clear();
+
+      if (currentFilterKey) {
+        const idExact = String(currentFilter || "").trim();
+        if (!idExact) { refreshRoutesSource(); return; }
+        const { data, error } = await sb.from("live_positions")
+          .select("driver_id,lat,lng,updated_at").ilike("driver_id", idExact)
+          .gte("updated_at", cutoffIso).order("updated_at", { ascending: true }).limit(MAX_POINTS);
+        if (seq !== routeFetchSeq) return;
+        if (error) { logError("ERR_FETCH_ROUTE_FOLLOW", error.message); return; }
+        const key = normId(idExact), arr = [];
+        for (const row of data || []) {
+          const lat = Number(row.lat), lng = Number(row.lng);
+          if (!isValidLatLng(lat, lng)) continue;
+          const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
+          if (!ts) continue;
+          arr.push({ lng, lat, ts });
+        }
+        const minTs = now - ROUTE_MS;
+        while (arr.length && arr[0].ts < minTs) arr.shift();
+        if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
+        if (arr.length >= 2) routePoints.set(key, arr);
+        refreshRoutesSource(); return;
+      }
+
+      const bb = getBoundsBBoxPadded();
+      if (!bb) { refreshRoutesSource(); return; }
+      const { data, error } = await sb.from("live_positions")
+        .select("driver_id,lat,lng,updated_at").gte("updated_at", cutoffIso)
+        .gte("lat", bb.south).lte("lat", bb.north).gte("lng", bb.west).lte("lng", bb.east)
+        .order("driver_id", { ascending: true }).order("updated_at", { ascending: true })
+        .limit(BBOX_LIMIT_ROUTE_POINTS);
+      if (seq !== routeFetchSeq) return;
+      if (error) { logError("ERR_FETCH_ROUTE_BBOX", error.message); return; }
+      for (const row of data || []) {
+        const driverKey = normId(row?.driver_id); if (!driverKey) continue;
+        const lat = Number(row.lat), lng = Number(row.lng);
+        if (!isValidLatLng(lat, lng)) continue;
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
+        if (!ts) continue;
+        const arr = routePoints.get(driverKey) ?? [];
+        arr.push({ lng, lat, ts }); routePoints.set(driverKey, arr);
+      }
+      for (const [driverKey, arr] of routePoints.entries()) {
+        const minTs = now - ROUTE_MS;
+        while (arr.length && arr[0].ts < minTs) arr.shift();
+        if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
+        const last = arr[arr.length - 1];
+        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) routePoints.delete(driverKey);
+      }
+      refreshRoutesSource();
+    }
+
+    // ─────────────────────────────────────────────────
+    // NEU: FETCH: AKTIVE FAHRTEN
+    // Lädt Position eines reaktivierten Fahrers direkt per driver_id (kein BBox-Filter)
+    // Retry bis Position in v_live_positions_latest sichtbar oder Timeout
+    async function fetchPositionWithRetry(driverKey, attempts = 5, delayMs = 1500) {
+      for (let i = 0; i < attempts; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, delayMs));
+        if (endedDrivers.has(driverKey)) return; // inzwischen wieder beendet
+        const { data, error } = await sb.from("v_live_positions_latest")
+          .select("driver_id,lat,lng,updated_at")
+          .ilike("driver_id", driverKey)
+          .limit(1);
+        if (error) { logError("ERR_FETCH_POS_RETRY", error.message); continue; }
+        const row = data?.[0];
+        if (!row) { logDebug("fetchPositionWithRetry: kein Eintrag (Versuch", i + 1, "):", driverKey); continue; }
+        const lat = Number(row.lat), lng = Number(row.lng);
+        if (!isValidLatLng(lat, lng)) return;
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (Date.now() - ts > STALE_MS) return; // Position zu alt
+        const rawId = (row.driver_id ?? "").toString();
+        positions.set(driverKey, { rawId, lng, lat, ts });
+        logDebug("fetchPositionWithRetry: Position gesetzt (Versuch", i + 1, "):", driverKey);
+        refreshDriversSource();
+        return;
+      }
+      logDebug("fetchPositionWithRetry: kein Ergebnis nach", attempts, "Versuchen für", driverKey);
+    }
+
+    // ─────────────────────────────────────────────────
+    async function fetchActiveRides() {
+      const seq = ++ridesFetchSeq;
+      // Kein BBox-Filter: Fahrer-Position kann außerhalb der sichtbaren Karte liegen
+      // während die Route durch den sichtbaren Bereich führt → würde Route verschwinden lassen
+      // Rides sind durch LIMIT 200 begrenzt, BBox daher nicht nötig
+      let query = sb.from("v_aktive_fahrten").select("*");
+
+      const { data, error } = await query.limit(200);
+      if (seq !== ridesFetchSeq) return;
+      if (error) { logError("ERR_FETCH_RIDES", error.message); return; }
+
+      // Fahrer die vorher aktiv waren merken
+      const prevDriverKeys = new Set(
+        [...activeRides.values()].map(r => normId(r.driver_id))
+      );
+
+      activeRides.clear();
+      const reactivatedDrivers = new Set(); // Fahrer die gerade entsperrt wurden
+      for (const row of data || []) {
+        if (!row.ride_id) continue;
+        const driverKey = normId(row.driver_id);
+        if (!driverKey) continue;
+        // Neue bestätigte Fahrt → Sperren sofort aufheben (Neustart desselben Fahrers)
+        if (recentlyEnded.has(driverKey) || endedDrivers.has(driverKey)) {
+          recentlyEnded.delete(driverKey);
+          endedDrivers.delete(driverKey);
+          reactivatedDrivers.add(driverKey); // Position fehlt → fetchLatest nötig
+        }
+        if (positions.size > 0 && !positions.has(driverKey)) continue;
+        activeRides.set(row.ride_id, row);
+      }
+      // Reaktivierte Fahrer: positions ist leer → Retry per driver_id bis Marker erscheint
+      for (const dk of reactivatedDrivers) {
+        fetchPositionWithRetry(dk).catch(() => {});
+      }
+      renderModeUI(); // Lock-Zustand aktualisieren
+
+      // Fahrer die nicht mehr in aktiven Rides sind → Marker sofort entfernen
+      const nowDriverKeys = new Set(
+        [...activeRides.values()].map(r => normId(r.driver_id))
+      );
+      let markerChanged = false;
+      for (const driverKey of prevDriverKeys) {
+        if (!nowDriverKeys.has(driverKey)) {
+          endedDrivers.add(driverKey);
+          positions.delete(driverKey);
+          routePoints.delete(driverKey);
+          markerChanged = true;
+        }
+      }
+
+      // Fix B: Reload-Bug – Positionen ohne aktive Fahrt bereinigen
+      // Schonfenster 10s: frisch gestartete Fahrten erscheinen kurz vor v_aktive_fahrten-JOIN
+      const now = Date.now();
+      for (const [key, pos] of positions.entries()) {
+        if (nowDriverKeys.has(key)) continue;
+        if (recentlyEnded.has(key)) continue; // manuell gesperrt → bereits behandelt
+        const posAge = now - (pos.ts ?? 0);
+        if (posAge < 10_000) continue; // Schonfenster: frische Position nicht sofort löschen
+        endedDrivers.add(key);
+        positions.delete(key);
+        routePoints.delete(key);
+        markerChanged = true;
+      }
+
+      if (markerChanged) { refreshDriversSource(); refreshRoutesSource(); }
+
+      refreshRidesSource();
+    }
+
+    // ─────────────────────────────────────────────────
+    // REALTIME: LIVE_POSITIONS
+    // ─────────────────────────────────────────────────
+    function subscribe() {
+      if (!sb || rtConnecting) return;
+      rtConnecting = true;
+      try { if (channel) sb.removeChannel(channel); } catch (_) {}
+
+      channel = sb.channel("live_positions_map")
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_positions" }, (payload) => {
+          if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
+            upsertRealtime(payload.new);
+          } else if (payload?.eventType === "DELETE") {
+            const key = normId(payload.old?.driver_id);
+            if (key) {
+              positions.delete(key);
+              routePoints.delete(key);
+              // Auch zugehörige Rides sofort entfernen → Zielpunkt + Route weg
+              for (const [rideId, ride] of activeRides.entries()) {
+                if (normId(ride.driver_id) === key) activeRides.delete(rideId);
+              }
+              refreshDriversSource();
+              refreshRoutesSource();
+              refreshRidesSource();
+            }
+          }
+        })
+        .subscribe((status) => {
+          rtLastStatus = status;
+          if (status === "SUBSCRIBED") { rtLastOkAt = Date.now(); rtReconnectIdx = 0; setRealtimeState("AN"); }
+          else if (["CLOSED","CHANNEL_ERROR","TIMED_OUT"].includes(status)) setRealtimeState("RECONNECT");
+          else setRealtimeState("AUS");
+          logDebug("Realtime status:", status);
+          rtConnecting = false;
+        });
+      startRealtimeWatchdog();
+    }
+
+    // ─────────────────────────────────────────────────
+    // NEU: REALTIME: RIDES
+    // ─────────────────────────────────────────────────
+    function subscribeRides() {
+      if (!sb) return;
+      try { if (ridesChannel) sb.removeChannel(ridesChannel); } catch (_) {}
+
+      ridesChannel = sb.channel("rides_map")
+        .on("postgres_changes", { event: "*", schema: "public", table: "rides" }, async (payload) => {
+          const ev     = payload?.eventType;
+          const rideId = payload.new?.id || payload.old?.id;
+
+          if (ev === "DELETE") {
+            if (rideId) {
+              activeRides.delete(rideId);
+              const driverKey = normId(payload.old?.driver_id);
+              if (driverKey) {
+                endedDrivers.add(driverKey);
+                positions.delete(driverKey);
+                routePoints.delete(driverKey);
+              }
+              refreshRidesSource();
+              refreshDriversSource();
+              refreshRoutesSource();
+              resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
+              return;
+            }
+          }
+          if (!rideId) return;
+          if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
+            activeRides.delete(rideId);
+            const driverKey = normId(payload.new?.driver_id);
+            if (driverKey) {
+              endedDrivers.add(driverKey);
+              positions.delete(driverKey);
+              routePoints.delete(driverKey);
+            }
+            refreshRidesSource();
+            refreshDriversSource();
+            refreshRoutesSource();
+            resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
+            return;
+          }
+          if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
+
+          // Sofort versuchen (View-JOIN braucht manchmal 1–2s)
+          async function loadRideWithRetry(id, attempts = 3, delayMs = 1500) {
+            for (let i = 0; i < attempts; i++) {
+              if (i > 0) await new Promise(r => setTimeout(r, delayMs));
+              const { data, error } = await sb
+                .from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
+              if (!error && data) {
+                const dk = normId(data.driver_id);
+                const wasBlocked = recentlyEnded.has(dk) || endedDrivers.has(dk);
+                recentlyEnded.delete(dk);
+                endedDrivers.delete(dk);
+                activeRides.set(id, data);
+                refreshRidesSource();
+                if (wasBlocked) fetchPositionWithRetry(dk).catch(() => {}); // Position neu laden → Marker
+                logDebug("Ride geladen nach", i, "Retry(s):", id);
+                return;
+              }
+              logDebug("Ride noch nicht in View (Versuch", i + 1, "):", error?.message);
+            }
+            // Letzter Fallback: vollen Fetch
+            logDebug("Ride-Einzelabruf fehlgeschlagen – lade alle aktiven Rides");
+            await fetchActiveRides().catch(() => {});
+          }
+          loadRideWithRetry(rideId).catch(() => {});
+        })
+        .subscribe((status) => { logDebug("Rides channel:", status); });
+    }
+
+    // ─────────────────────────────────────────────────
+    // REALTIME WATCHDOG
+    // ─────────────────────────────────────────────────
+    function startRealtimeWatchdog() {
+      if (rtWatchdogTimer) return;
+      rtWatchdogTimer = setInterval(() => {
+        if (!isTabVisible()) return;
+        const age = Date.now() - (rtLastOkAt || 0);
+        if (rtLastStatus !== "SUBSCRIBED" && age > RT_STALE_MS) {
+          const wait = RT_RECONNECT_BACKOFF[Math.min(rtReconnectIdx, RT_RECONNECT_BACKOFF.length - 1)];
+          rtReconnectIdx++;
+          setRealtimeState("RECONNECT");
+          logError("WARN_RT_RECONNECT", "Reconnecting", { status: rtLastStatus, ageMs: age, backoffMs: wait });
+          setTimeout(() => { try { subscribe(); } catch (_) {} }, wait);
+        }
+      }, RT_WATCHDOG_MS);
+    }
+    function stopRealtimeWatchdog() {
+      if (rtWatchdogTimer) { clearInterval(rtWatchdogTimer); rtWatchdogTimer = null; }
+    }
+
+    // ─────────────────────────────────────────────────
+    // REALTIME UPSERT (live_positions)
+    // ─────────────────────────────────────────────────
+    function upsertRealtime(row) {
+      if (!map || !row?.driver_id) return;
+      const rawId = (row.driver_id ?? "").toString();
+      const driverKey = normId(rawId); if (!driverKey) return;
+      if (endedDrivers.has(driverKey)) return;
+      const lat = Number(row.lat), lng = Number(row.lng);
+      if (!isValidLatLng(lat, lng)) return;
+      const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+      if (Date.now() - ts > STALE_MS) return;
+
+      if (currentFilterKey) {
+        if (driverKey !== currentFilterKey) return;
+        positions.set(driverKey, { rawId, lng, lat, ts });
+      } else {
+        const bb = getBoundsBBoxPadded();
+        if (bb && !isInBbox(bb, lng, lat)) return;
+        positions.set(driverKey, { rawId, lng, lat, ts });
+      }
+
+      const now = Date.now(), minTs = now - ROUTE_MS;
+      const arr = routePoints.get(driverKey) ?? [];
+      arr.push({ lng, lat, ts });
+      while (arr.length && arr[0].ts < minTs) arr.shift();
+      if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
+      routePoints.set(driverKey, arr);
+
+      refreshDriversSource(); refreshRoutesSource(); setLast(new Date());
+      const sinceOk = Date.now() - (lastImpactOkAt || 0);
+      if (shouldPollImpact() && sinceOk > 3000) fetchImpactOnce().catch(() => {});
+    }
+
+    // ─────────────────────────────────────────────────
+    // PRUNE STALE POSITIONS + ORPHANED RIDES
+    // ─────────────────────────────────────────────────
+    const pruneTimer = setInterval(() => {
+      const now = Date.now();
+      let driversChanged = false;
+      let ridesChanged   = false;
+
+      // 1. Stale Fahrer-Positionen entfernen
+      for (const [key, p] of positions.entries()) {
+        if (now - (p?.ts || 0) > STALE_MS) {
+          positions.delete(key);
+          routePoints.delete(key);
+          driversChanged = true;
+        }
+      }
+
+      // 2. Rides ohne aktive Fahrer-Position ausblenden
+      // (Fahrt in DB noch aktiv, aber Fahrer sendet kein GPS mehr)
+      for (const [rideId, ride] of activeRides.entries()) {
+        const driverKey = normId(ride.driver_id);
+        if (!positions.has(driverKey)) {
+          activeRides.delete(rideId);
+          ridesChanged = true;
+        }
+      }
+
+      if (driversChanged) { refreshDriversSource(); refreshRoutesSource(); }
+      if (ridesChanged)   { refreshRidesSource(); }
+    }, PRUNE_EVERY_MS);
+
+    // ─────────────────────────────────────────────────
+    // INIT
+    // ─────────────────────────────────────────────────
+    function initMap() {
+      if (!validateConfigOrFail()) return;
+      sb  = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+      map = initMapbox();
+      if (!map) return;
+
+      map.on("click", (e) => {
+        if (markerPopup) { markerPopup.remove(); markerPopup = null; }
+        if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
+        // Mitfahrer: Modi sind gegenseitig ausschließend (else if)
+        if (paxMarkerMode) {
+          // Treffpunkt per Kartenklick setzen
+          if (!isPaxInputLocked()) {
+            setPaxMarkerPos(e.lngLat.lng, e.lngLat.lat);
+            paxMarkerMode = false;
+            document.getElementById("btnPaxMarker")?.classList.remove("active-pax");
+            showHint("");
+          }
+          // Bei Cooldown: Modus bleibt aktiv, Klick wird ignoriert
+        } else if (paxTargetMode) {
+          // Zielmarker per Kartenklick setzen
+          if (!isPaxInputLocked() && !paxSearchActive) {
+            setPaxTargetPos(e.lngLat.lng, e.lngLat.lat);
+            paxTargetMode = false;
+            document.getElementById("btnPaxTarget")?.classList.remove("active-pax");
+            showHint("");
+          }
+        }
+      });
+
+      document.getElementById("panelTitle")?.addEventListener("click", () => {
+        document.querySelector(".panel")?.classList.toggle("collapsed");
+        if (document.querySelector(".panel")?.classList.contains("collapsed")) hideHint();
+        onVisibilityOrPanelChange();
+      });
+
+      document.getElementById("btnApply")?.addEventListener("click", async () => {
+        const df = document.getElementById("driverFilter");
+        currentFilter = df?.value?.trim() || "";
+        currentFilterKey = normId(currentFilter);
+        updateSelectedLayerFilter();
+        await fetchLatest(); await fetchRouteHistory(); refreshDriversSource(); onVisibilityOrPanelChange();
+      });
+
+      document.getElementById("btnAll")?.addEventListener("click", async () => {
+        const df = document.getElementById("driverFilter");
+        if (df) df.value = "";
+        currentFilter = ""; currentFilterKey = "";
+        updateSelectedLayerFilter();
+        if (markerPopup) { markerPopup.remove(); markerPopup = null; }
+        if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
+        map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
+        await fetchLatest(); await fetchRouteHistory();
+        await fetchActiveRides(); // NEU
+        refreshDriversSource(); onVisibilityOrPanelChange();
+      });
+
+      document.getElementById("btnToggleRoutes")?.addEventListener("click", () => {
+        routesVisible = !routesVisible;
+        if (map.getLayer("er-routes-line"))
+          map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
+        const btn = document.getElementById("btnToggleRoutes");
+        if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
+      });
+
+      document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
+        activeOnlyMode = !activeOnlyMode;
+        const btn = document.getElementById("btnActiveOnly");
+        if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
+        showHint(activeOnlyMode ? "Nur Fahrer mit aktiver Fahrt." : "Alle Fahrer.");
+        await fetchLatest(); await fetchRouteHistory();
+        await fetchActiveRides(); // Bug 3: Rides laden damit client-seitiger Filter greift
+        refreshDriversSource(); onVisibilityOrPanelChange();
+      });
+
+      document.addEventListener("visibilitychange", () => { onVisibilityOrPanelChange(); });
+
+      const debouncedReload = debounce(async () => {
+        if (!map || currentFilterKey) return;
+        await fetchLatest().catch(() => {});           // erst Positionen
+        await fetchActiveRides().catch(() => {});      // dann Rides (filter greift jetzt)
+        await fetchRouteHistory().catch(() => {});
+      }, BBOX_DEBOUNCE_MS);
+
+      onMoveEnd = debouncedReload;
+      onZoomEnd = debouncedReload;
+      map.on("moveend", onMoveEnd);
+      map.on("zoomend", onZoomEnd);
+
+      // Reihenfolge wichtig: erst Positionen laden, dann Rides filtern
+      // Sonst ist positions noch leer und stale Rides werden trotzdem eingelesen
+      fetchLatest()
+        .catch(e => logError("ERR_INIT_FETCH_LATEST", e?.message || String(e)))
+        .then(() => fetchActiveRides())
+        .catch(e => logError("ERR_INIT_FETCH_RIDES", e?.message || String(e)));
+      fetchRouteHistory().catch(e => logError("ERR_INIT_FETCH_ROUTE", e?.message || String(e)));
+
+      subscribe();
+      subscribeRides(); // NEU
+
+      // Periodischer Rides-Poll (5s) als Fallback falls Realtime nicht feuert
+      ridesPolTimer = setInterval(() => {
+        if (isTabVisible()) fetchActiveRides().catch(() => {});
+      }, 5_000);
+
+      // Modus-Umschalter initialisieren
+      renderModeUI();
+
+      onVisibilityOrPanelChange();
+    }
+
+    // ─────────────────────────────────────────────────
+    // CLEANUP
+    // ─────────────────────────────────────────────────
+    function cleanup() {
+      try { clearInterval(pruneTimer); }    catch (_) {}
+      try { clearImpactTimer(); }           catch (_) {}
+      try { stopRealtimeWatchdog(); }       catch (_) {}
+      try { if (map && onMoveEnd) map.off("moveend", onMoveEnd); } catch (_) {}
+      try { if (map && onZoomEnd) map.off("zoomend", onZoomEnd); } catch (_) {}
+      try { if (sb && channel)       sb.removeChannel(channel);       } catch (_) {}
+      try { if (sb && ridesChannel)  sb.removeChannel(ridesChannel);  } catch (_) {}
+      try { if (ridesPolTimer) clearInterval(ridesPolTimer); } catch (_) {}
+      try { if (map && map.getLayer(LAYER_RIDE_ROUTES)) map.removeLayer(LAYER_RIDE_ROUTES); } catch (_) {}
+      try { if (map && map.getSource(RIDES_ROUTE_SOURCE)) map.removeSource(RIDES_ROUTE_SOURCE); } catch (_) {}
+      try { if (map && map.getLayer(LAYER_PAX_MATCH)) map.removeLayer(LAYER_PAX_MATCH); } catch (_) {}
+      try { if (map && map.getSource(PAX_MATCH_SOURCE)) map.removeSource(PAX_MATCH_SOURCE); } catch (_) {}
+      try { if (paxCooldownTimer) { clearInterval(paxCooldownTimer); paxCooldownTimer = null; } } catch (_) {}
+      try { if (paxTargetMarker) { paxTargetMarker.remove(); paxTargetMarker = null; } } catch (_) {}
+      try { if (markerPopup) markerPopup.remove(); } catch (_) {}
+      try { if (ridePopup)   ridePopup.remove();   } catch (_) {} // NEU
+      try { if (map) map.remove(); } catch (_) {}
+    }
+
+    window.addEventListener("beforeunload", cleanup);
+    window.addEventListener("pagehide",     cleanup);
+    // ─────────────────────────────────────────────────
+    // NACHT-MODUS
+    // ─────────────────────────────────────────────────
+    const NIGHT_STYLE = "mapbox://styles/mapbox/dark-v11";
+    const DAY_STYLE   = "mapbox://styles/mapbox/streets-v12";
+    let nightMode = localStorage.getItem("er_night_mode") === "1";
+
+    function applyNightMode(on) {
+      nightMode = on;
+      localStorage.setItem("er_night_mode", on ? "1" : "0");
+      document.body.classList.toggle("night", on);
+      const btn = document.getElementById("btnNightMode");
+      if (btn) btn.textContent = on ? "☀️" : "🌙";
+      if (!map) return;
+      map.setStyle(on ? NIGHT_STYLE : DAY_STYLE);
+      // Layers nach Style-Wechsel neu hinzufügen
+      map.once("style.load", () => {
+        routesReady = false;
+        initMapboxLayers(map);
+        refreshDriversSource();
+        refreshRoutesSource();
+        refreshRidesSource();
+      });
+    }
+
+    function initMapboxLayers(m) {
+      // Routen
+      if (!m.getSource("er-routes")) {
+        m.addSource("er-routes", { type:"geojson", data:{type:"FeatureCollection",features:[]} });
+        m.addLayer({ id:"er-routes-line", type:"line", source:"er-routes",
+          layout:{"line-join":"round","line-cap":"round","visibility": routesVisible ? "visible" : "none"},
+          paint:{"line-width":4,"line-opacity":0.75,"line-color":["get","color"]} });
+        m.on("mouseenter","er-routes-line",()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave","er-routes-line",()=>{m.getCanvas().style.cursor="";});
+      }
+      // Fahrer
+      if (!m.getSource(DRIVERS_SOURCE)) {
+        m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
+        m.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-radius":["step",["get","point_count"],16,25,20,50,26,100,32],"circle-color":"rgba(199,223,58,0.70)","circle-stroke-width":1,"circle-stroke-color":"rgba(17,24,37,0.35)"}});
+        m.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":["DIN Offc Pro Medium","Arial Unicode MS Bold"],"text-size":12},paint:{"text-color":"#0b0f14"}});
+        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(199,223,58,0.35)","rgba(199,223,58,0.92)"],"circle-opacity":["case",["==",["get","stale"],1],0.65,1],"circle-stroke-width":2,"circle-stroke-color":"rgba(199,223,58,0.35)"}});
+        m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":9,"circle-color":["case",["==",["get","stale"],1],"rgba(199,223,58,0.75)","rgba(199,223,58,0.98)"],"circle-stroke-width":3,"circle-stroke-color":"rgba(255,255,255,0.35)"}});
+        m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
+        m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;const rawId=f.properties?.rawId??"";const df=document.getElementById("driverFilter");if(df)df.value=rawId;currentFilter=String(rawId).trim();currentFilterKey=normId(currentFilter);updateSelectedLayerFilter();m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
+        m.on("mouseenter",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="";});
+        m.on("mouseenter",LAYER_POINTS,()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave",LAYER_POINTS,()=>{m.getCanvas().style.cursor="";});
+      }
+      // Ride-Routen
+      if (!m.getSource(RIDES_ROUTE_SOURCE)) {
+        m.addSource(RIDES_ROUTE_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+        m.addLayer({id:LAYER_RIDE_ROUTES,type:"line",source:RIDES_ROUTE_SOURCE,layout:{"line-join":"round","line-cap":"round"},paint:{"line-color":"#ff9500","line-width":3,"line-opacity":0.65,"line-dasharray":[2,2]}});
+      }
+      // Ride-Ziele
+      if (!m.getSource(RIDES_SOURCE)) {
+        m.addSource(RIDES_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+        m.addLayer({id:LAYER_RIDE_DEST,type:"circle",source:RIDES_SOURCE,paint:{"circle-radius":10,"circle-color":"#ff9500","circle-opacity":0.92,"circle-stroke-width":2.5,"circle-stroke-color":"rgba(255,255,255,0.80)"}});
+        m.on("click",LAYER_RIDE_DEST,(e)=>{e.originalEvent?.stopPropagation();const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:550});openRidePopup(f);});
+        m.on("mouseenter",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="pointer";});
+        m.on("mouseleave",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="";});
+      }
+      // Mitfahrer-Match-Highlight (Ring um passende Fahrer)
+      if (!m.getSource(PAX_MATCH_SOURCE)) {
+        m.addSource(PAX_MATCH_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+        m.addLayer({
+          id: LAYER_PAX_MATCH, type:"circle", source:PAX_MATCH_SOURCE,
+          paint:{
+            "circle-radius": 14,
+            "circle-color":  "rgba(96,165,250,0.0)",
+            "circle-stroke-width": 3,
+            "circle-stroke-color": "#60a5fa",
+            "circle-stroke-opacity": 0.92,
+          }
+        });
+      }
+      const btn=document.getElementById("btnToggleRoutes");
+      if(btn)btn.textContent=routesVisible?"Ausblenden":"Einblenden";
+      routesReady=true;
+    }
+
+    document.addEventListener("DOMContentLoaded", initMap);
+    document.addEventListener("DOMContentLoaded", () => {
+      initAccordionHandlers();
+      // Gespeicherten Modus sofort anwenden (vor Map-Init)
+      document.body.classList.toggle("night", nightMode);
+      const btn = document.getElementById("btnNightMode");
+      if (btn) btn.textContent = nightMode ? "☀️" : "🌙";
+      document.getElementById("btnNightMode")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        applyNightMode(!nightMode);
+      });
+    });
+  </script>
+</body>
+</html>
