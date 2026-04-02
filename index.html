@@ -382,6 +382,49 @@
     .pax-match-status.none     { color: rgba(234,240,255,0.45); }
     .pax-match-status.cooldown { color: #fbbf24; }
 
+    /* ── Trefferliste V1 ── */
+    .pax-result-list {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      padding: 4px 10px 6px;
+      box-sizing: border-box;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .pax-result-list::-webkit-scrollbar { width: 3px; }
+    .pax-result-list::-webkit-scrollbar-thumb { background: rgba(199,223,58,0.25); border-radius: 999px; }
+    .pax-result-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      cursor: pointer;
+      transition: background .15s;
+      font-size: 12px;
+      color: #eaf0ff;
+    }
+    .pax-result-item:hover, .pax-result-item:active {
+      background: rgba(199,223,58,0.12);
+      border-color: rgba(199,223,58,0.25);
+    }
+    .pax-result-name {
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 180px;
+    }
+    .pax-result-dist {
+      font-size: 11px;
+      opacity: 0.6;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+
     .input-button-group {
       width:100%;
       max-width: 260px;
@@ -784,6 +827,7 @@
           <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
         </div>
         <div class="pax-match-status" id="paxMatchStatus"></div>
+        <div class="pax-result-list" id="paxResultList"></div>
       </div>
 
       <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
@@ -852,7 +896,7 @@
     const LAYER_PAX_MATCH       = "er-pax-match-ring";
 
     // Matching-Konstanten
-    const PAX_MATCH_RADIUS_KM   = 5.0;   // Fahrer muss innerhalb 5 km vom Treffpunkt sein
+    const PAX_MATCH_RADII_KM    = [2, 4, 6, 8, 10]; // Eskalierender Radius V1
     const PAX_MATCH_TIME_SLACK  = 10;    // +10 Min Puffer auf Zeitfenster
 
     // BBox / Debounce
@@ -1522,30 +1566,72 @@
       }
 
       paxStartTimes.push(Date.now());
-      const now = Date.now();
       paxMatchedKeys.clear();
 
-      for (const [driverKey, pos] of positions.entries()) {
-        if (endedDrivers.has(driverKey)) continue;
-        if (now - (pos.ts || 0) > STALE_MS) continue;
-        const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
-        if (distKm > PAX_MATCH_RADIUS_KM + paxTimeMin * 0.5) continue;
-        if (!driverHeadsTowardTarget(driverKey)) continue;
-        paxMatchedKeys.add(driverKey);
+      // Eskalierender Radius: 2 → 4 → 6 → 8 → 10 km
+      let hits = [];
+      let foundAtKm = null;
+      const now = Date.now();
+
+      for (const radiusKm of PAX_MATCH_RADII_KM) {
+        const candidates = [];
+        for (const [driverKey, pos] of positions.entries()) {
+          if (endedDrivers.has(driverKey)) continue;
+          if (now - (pos.ts || 0) > STALE_MS) continue;
+          const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
+          if (distKm > radiusKm) continue;
+          if (!driverHeadsTowardTarget(driverKey)) continue;
+          candidates.push({ driverKey, pos, distKm });
+        }
+        if (candidates.length > 0) {
+          hits = candidates;
+          foundAtKm = radiusKm;
+          break;
+        }
       }
+
+      // Sortierung: nächster zuerst
+      hits.sort((a, b) => a.distKm - b.distKm);
+      for (const { driverKey } of hits) paxMatchedKeys.add(driverKey);
 
       paxSearchActive = true;
       refreshPaxMatchLayer();
       updatePaxUI();
 
+      // Status-Zeile
       const statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) {
-        if (paxMatchedKeys.size > 0) {
-          statusEl.textContent = `${paxMatchedKeys.size} passende${paxMatchedKeys.size === 1 ? "r" : ""} Fahrer gefunden ✅`;
+        if (hits.length > 0) {
+          statusEl.textContent = `${hits.length} Fahrer gefunden (${foundAtKm} km Umkreis) ✅`;
           statusEl.className = "pax-match-status show found";
         } else {
-          statusEl.textContent = "Keine passenden Fahrer in der Nähe.";
+          statusEl.textContent = "Keine passenden Fahrer in 10 km Umkreis.";
           statusEl.className = "pax-match-status show none";
+        }
+      }
+
+      // Trefferliste rendern
+      const listEl = document.getElementById("paxResultList");
+      if (listEl) {
+        listEl.innerHTML = "";
+        if (hits.length > 0) {
+          listEl.style.display = "flex";
+          for (const { driverKey, pos, distKm } of hits) {
+            const distText = distKm < 1
+              ? `${Math.round(distKm * 1000)} m`
+              : `${distKm.toFixed(1)} km`;
+            const item = document.createElement("div");
+            item.className = "pax-result-item";
+            item.innerHTML = `<span class="pax-result-name">${pos.driver_id ?? driverKey}</span><span class="pax-result-dist">${distText}</span>`;
+            const snapLng = pos.lng;
+            const snapLat = pos.lat;
+            item.addEventListener("click", () => {
+              map.easeTo({ center: [snapLng, snapLat], zoom: 15, duration: 500 });
+            });
+            listEl.appendChild(item);
+          }
+        } else {
+          listEl.style.display = "none";
         }
       }
     }
@@ -1559,6 +1645,8 @@
       updatePaxUI();
       const statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) { statusEl.textContent = ""; statusEl.className = "pax-match-status"; }
+      const listEl = document.getElementById("paxResultList");
+      if (listEl) { listEl.innerHTML = ""; listEl.style.display = "none"; }
       // Cooldown NUR hier starten – Eingabephase (Zeitfenster, Zieltext) bleibt frei
       startPaxCooldown();
     }
