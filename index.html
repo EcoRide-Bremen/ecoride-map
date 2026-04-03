@@ -2551,33 +2551,53 @@
             refreshRidesSource();
             refreshDriversSource();
             refreshRoutesSource();
-            resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
+            resetImpactCounters(driverKey);
             return;
           }
           if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
+
+          // Guard: UPDATE-Events auf aktiven Rides (z.B. fahrer_lat Update) dürfen
+          // beendete Fahrer NICHT reaktivieren
+          const eventDriverKey = normId(payload.new?.driver_id);
+          if (eventDriverKey && endedDrivers.has(eventDriverKey)) {
+            logDebug("subscribeRides: Fahrer in endedDrivers – Event ignoriert:", eventDriverKey);
+            return;
+          }
 
           // Sofort versuchen (View-JOIN braucht manchmal 1–2s)
           async function loadRideWithRetry(id, attempts = 3, delayMs = 1500) {
             for (let i = 0; i < attempts; i++) {
               if (i > 0) await new Promise(r => setTimeout(r, delayMs));
+              // Guard: nach jeder Wartezeit nochmal prüfen (Ride könnte inzwischen beendet sein)
+              if (endedDrivers.has(eventDriverKey)) {
+                logDebug("loadRideWithRetry: Fahrer inzwischen in endedDrivers – abgebrochen:", eventDriverKey);
+                return;
+              }
               const { data, error } = await sb
                 .from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
               if (!error && data) {
                 const dk = normId(data.driver_id);
-                const wasBlocked = recentlyEnded.has(dk) || endedDrivers.has(dk);
+                // Zentraler Guard: endedDrivers ist die einzige Wahrheitsquelle
+                if (endedDrivers.has(dk)) {
+                  logDebug("loadRideWithRetry: Fahrer in endedDrivers – nicht reaktivieren:", dk);
+                  return;
+                }
+                const wasBlocked = recentlyEnded.has(dk);
                 recentlyEnded.delete(dk);
-                endedDrivers.delete(dk);
+                // endedDrivers.delete() hier NICHT – nur Realtime-DELETE/UPDATE-Handler darf das
                 activeRides.set(id, data);
                 refreshRidesSource();
-                if (wasBlocked) fetchPositionWithRetry(dk).catch(() => {}); // Position neu laden → Marker
+                if (wasBlocked) fetchPositionWithRetry(dk).catch(() => {});
                 logDebug("Ride geladen nach", i, "Retry(s):", id);
                 return;
               }
               logDebug("Ride noch nicht in View (Versuch", i + 1, "):", error?.message);
             }
-            // Letzter Fallback: vollen Fetch
-            logDebug("Ride-Einzelabruf fehlgeschlagen – lade alle aktiven Rides");
-            await fetchActiveRides().catch(() => {});
+            // Letzter Fallback: nur wenn Fahrer nicht beendet
+            if (!endedDrivers.has(eventDriverKey)) {
+              logDebug("Ride-Einzelabruf fehlgeschlagen – lade alle aktiven Rides");
+              await fetchActiveRides().catch(() => {});
+            }
           }
           loadRideWithRetry(rideId).catch(() => {});
         })
