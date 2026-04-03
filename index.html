@@ -2325,7 +2325,9 @@
           .gte("updated_at", cutoffIso).order("updated_at", { ascending: true }).limit(MAX_POINTS);
         if (seq !== routeFetchSeq) return;
         if (error) { logError("ERR_FETCH_ROUTE_FOLLOW", error.message); return; }
-        const key = normId(idExact), arr = [];
+        const key = normId(idExact);
+        if (endedDrivers.has(key)) { refreshRoutesSource(); return; } // Fahrer beendet → keine Route
+        const arr = [];
         for (const row of data || []) {
           const lat = Number(row.lat), lng = Number(row.lng);
           if (!isValidLatLng(lat, lng)) continue;
@@ -2351,6 +2353,7 @@
       if (error) { logError("ERR_FETCH_ROUTE_BBOX", error.message); return; }
       for (const row of data || []) {
         const driverKey = normId(row?.driver_id); if (!driverKey) continue;
+        if (endedDrivers.has(driverKey)) continue; // Fahrer beendet → Route nicht neu aufbauen
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) continue;
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
@@ -2419,12 +2422,15 @@
         if (!row.ride_id) continue;
         const driverKey = normId(row.driver_id);
         if (!driverKey) continue;
-        // Neue bestätigte Fahrt → Sperren sofort aufheben (Neustart desselben Fahrers)
-        if (recentlyEnded.has(driverKey) || endedDrivers.has(driverKey)) {
+        // Neue bestätigte Fahrt → Sperren aufheben – NUR wenn Eintrag neu ist (nicht im Poll-Overlap)
+        // endedDrivers wird NUR im Realtime-Handler gelöscht (subscribeRides/loadRideWithRetry)
+        // Im Poll (fetchActiveRides) NICHT löschen – Race Condition: DB zeigt noch alten Ride
+        if (recentlyEnded.has(driverKey)) {
           recentlyEnded.delete(driverKey);
-          endedDrivers.delete(driverKey);
-          reactivatedDrivers.add(driverKey); // Position fehlt → fetchLatest nötig
+          // endedDrivers bleibt – wird vom Realtime-Handler aufgeräumt
+          reactivatedDrivers.add(driverKey);
         }
+        if (endedDrivers.has(driverKey)) continue; // Fahrer manuell beendet → Poll ignoriert ihn
         if (positions.size > 0 && !positions.has(driverKey)) continue;
         activeRides.set(row.ride_id, row);
       }
