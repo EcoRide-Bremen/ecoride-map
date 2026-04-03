@@ -1909,10 +1909,7 @@
       const nameSpan = document.createElement("span");
       nameSpan.style.fontWeight = "700";
       nameSpan.textContent = rawId;
-      const ageSpan = document.createElement("span");
-      ageSpan.textContent = formatAge(Date.now() - ts);
       sub.appendChild(nameSpan);
-      sub.appendChild(ageSpan);
 
       const actions = document.createElement("div");
       actions.className = "er-pop-actions";
@@ -1951,9 +1948,7 @@
       markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
         .setLngLat(coords).setDOMContent(root).addTo(map);
 
-      // Zeitanzeige live hochzählen
-      const ageTimer = setInterval(() => { ageSpan.textContent = formatAge(Date.now() - ts); }, 1000);
-      markerPopup.on("close", () => clearInterval(ageTimer));
+
     }
 
     // ─────────────────────────────────────────────────
