@@ -1906,7 +1906,13 @@
 
       const sub = document.createElement("div");
       sub.className = "er-pop-sub";
-      sub.innerHTML = `<span style="font-weight:700">${rawId}</span><span>${formatAge(ageMs)}</span>`;
+      const nameSpan = document.createElement("span");
+      nameSpan.style.fontWeight = "700";
+      nameSpan.textContent = rawId;
+      const ageSpan = document.createElement("span");
+      ageSpan.textContent = formatAge(Date.now() - ts);
+      sub.appendChild(nameSpan);
+      sub.appendChild(ageSpan);
 
       const actions = document.createElement("div");
       actions.className = "er-pop-actions";
@@ -1914,11 +1920,7 @@
       const btnRoute = document.createElement("button");
       btnRoute.className = "er-pop-btn primary"; btnRoute.type = "button"; btnRoute.textContent = "Route anzeigen";
 
-      const btnCopy = document.createElement("button");
-      btnCopy.className = "er-pop-btn"; btnCopy.type = "button"; btnCopy.textContent = "Kopieren";
-
       actions.appendChild(btnRoute);
-      actions.appendChild(btnCopy);
       root.appendChild(title);
       root.appendChild(sub);
       root.appendChild(actions);
@@ -1943,17 +1945,15 @@
         refreshDriversSource();
         onVisibilityOrPanelChange();
       });
-      btnCopy.addEventListener("click", async (ev) => {
-        ev.preventDefault(); ev.stopPropagation();
-        const ok = await copyText(String(rawId));
-        showHint(ok ? "Driver ID kopiert." : "Kopieren nicht möglich.");
-        setTimeout(() => hideHint(), 1200);
-      });
 
       const coords = feature.geometry?.coordinates;
       if (!Array.isArray(coords) || coords.length !== 2) return;
       markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
         .setLngLat(coords).setDOMContent(root).addTo(map);
+
+      // Zeitanzeige live hochzählen
+      const ageTimer = setInterval(() => { ageSpan.textContent = formatAge(Date.now() - ts); }, 1000);
+      markerPopup.on("close", () => clearInterval(ageTimer));
     }
 
     // ─────────────────────────────────────────────────
