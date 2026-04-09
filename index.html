@@ -2405,7 +2405,9 @@
       // Kein BBox-Filter: Fahrer-Position kann außerhalb der sichtbaren Karte liegen
       // während die Route durch den sichtbaren Bereich führt → würde Route verschwinden lassen
       // Rides sind durch LIMIT 200 begrenzt, BBox daher nicht nötig
-      let query = sb.from("v_aktive_fahrten").select("*");
+      let query = sb.from("v_aktive_fahrten").select(
+        "ride_id,driver_id,fahrer_name,fahrer_bewertung,fahrer_lat,fahrer_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte"
+      );
 
       const { data, error } = await query.limit(200);
       if (seq !== ridesFetchSeq) return;
