@@ -926,18 +926,22 @@
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
 
-    function hasFreshDriverPosition(driverKey) {
+    function hasVisibleMarkerPosition(driverKey) {
       const pos = positions.get(driverKey);
       if (!pos?.ts) return false;
-      // Dieselbe Frischegrenze wie der Fahrer-Marker, damit Marker und Route
-      // sichtbar immer denselben Zustand haben.
       return (Date.now() - pos.ts) <= STALE_VISUAL_MS;
+    }
+
+    function hasRidePositionWithinStaleWindow(driverKey) {
+      const pos = positions.get(driverKey);
+      if (!pos?.ts) return false;
+      return (Date.now() - pos.ts) <= STALE_MS;
     }
 
     function getVisibleActiveRides() {
       return [...activeRides.entries()].filter(([, ride]) => {
         const driverKey = normId(ride.driver_id);
-        return !!driverKey && hasFreshDriverPosition(driverKey);
+        return !!driverKey && hasVisibleMarkerPosition(driverKey);
       });
     }
 
@@ -1846,7 +1850,7 @@
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
         if (!driverKey) continue;
-        const isFresh = hasFreshDriverPosition(driverKey);
+        const isFresh = hasVisibleMarkerPosition(driverKey);
         const candidateTs = new Date(ride.updated_at || ride.created_at || 0).getTime() || 0;
         const prev = canonicalRideByDriver.get(driverKey);
         if (!prev) {
@@ -2714,7 +2718,7 @@
       // (Fahrt in DB noch aktiv, aber Fahrer sendet kein GPS mehr)
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
-        if (!driverKey || !hasFreshDriverPosition(driverKey)) {
+        if (!driverKey || !hasRidePositionWithinStaleWindow(driverKey)) {
           activeRides.delete(rideId);
           ridesChanged = true;
         }
