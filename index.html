@@ -2336,11 +2336,8 @@
         return;
       }
 
-      const bb = getBoundsBBoxPadded();
-      if (!bb) return;
       const { data, error } = await sb.from("v_live_positions_latest")
         .select("driver_id,lat,lng,updated_at").gte("updated_at", cutoffIso)
-        .gte("lat", bb.south).lte("lat", bb.north).gte("lng", bb.west).lte("lng", bb.east)
         .limit(BBOX_LIMIT_LATEST);
       if (seq !== latestFetchSeq) return;
       if (error) { logError("ERR_FETCH_LATEST_BBOX_V", error.message); showHint("Fehler beim Laden."); return; }
