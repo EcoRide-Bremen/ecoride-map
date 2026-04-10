@@ -1815,12 +1815,10 @@
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
       const feats = [];
       const now = Date.now();
-      const bb = currentFilterKey ? null : getBoundsBBoxPadded();
       for (const [driverKey, p] of positions.entries()) {
         if (!p) continue;
         if (endedDrivers.has(driverKey)) continue;
         if (currentFilterKey && driverKey !== currentFilterKey) continue;
-        if (!currentFilterKey && bb && !isInBbox(bb, Number(p.lng), Number(p.lat))) continue;
         // Bug 3: Aktive-Modus = nur Fahrer mit aktiver Fahrt in activeRides
         if (activeOnlyMode && !currentFilterKey) {
           const hasRide = [...activeRides.values()].some(r => normId(r.driver_id) === driverKey);
