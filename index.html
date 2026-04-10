@@ -844,10 +844,14 @@
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
     function logMapPath(...args) { console.log("[MAP_PATH]", new Date().toISOString(), ...args); }
-    function snapshotMapState(label, driverKey = null) {
+    function getDriverSourceFeatureCount() {
       const driverSource = map?.getSource?.(DRIVERS_SOURCE);
       const driversData = driverSource?._data;
-      const driverFeatures = Array.isArray(driversData?.features) ? driversData.features.length : null;
+      return Array.isArray(driversData?.features) ? driversData.features.length : null;
+    }
+
+    function snapshotMapState(label, driverKey = null) {
+      const driverFeatures = getDriverSourceFeatureCount();
       const pos = driverKey ? positions.get(driverKey) : null;
       logMapPath(label, {
         driverKey,
@@ -1883,8 +1887,9 @@
         });
       }
       applyDefaultDriverLayerFilters();
-      logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length });
+      logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length, sourceFeatureCountBefore: getDriverSourceFeatureCount() });
       map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
+      logMapPath("refreshDriversSource:after-setData", { markerFeatures: feats.length, sourceFeatureCountAfter: getDriverSourceFeatureCount() });
       updateSelectedLayerFilter();
       setCount(feats.length);
       setSafeTextContent("impactMarkers", String(feats.length));
@@ -2262,7 +2267,9 @@
         hideAllDriverLayersImmediately();
         clearSelection();
         if (map?.getSource?.(DRIVERS_SOURCE)) {
+          logMapPath("rideEnd:driver-source-before-empty", { sourceFeatureCountBefore: getDriverSourceFeatureCount() });
           map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
+          logMapPath("rideEnd:driver-source-after-empty", { sourceFeatureCountAfter: getDriverSourceFeatureCount() });
         }
         if (map?.getSource?.(RIDES_ROUTE_SOURCE)) {
           map.getSource(RIDES_ROUTE_SOURCE).setData({ type: "FeatureCollection", features: [] });
