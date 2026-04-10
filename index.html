@@ -865,8 +865,8 @@
     // KONSTANTEN
     // ─────────────────────────────────────────────────
     const ACTIVE_ONLY_MS        = 2  * 60_000;
-    const STALE_VISUAL_MS       = 2  * 60_000;
-    const STALE_MS              = 5  * 60_000;
+    const MARKER_FRESH_MS       = 2  * 60_000;
+    const RIDE_FRESH_MS         = 5  * 60_000;
     const PRUNE_EVERY_MS        = 10_000;
     const ROUTE_MS              = 10 * 60_000;
     const MAX_POINTS            = 200;
@@ -926,22 +926,27 @@
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
 
-    function hasVisibleMarkerPosition(driverKey) {
+    function getDriverRouteState(driverKey) {
       const pos = positions.get(driverKey);
-      if (!pos?.ts) return false;
-      return (Date.now() - pos.ts) <= STALE_VISUAL_MS;
+      if (!pos?.ts) return "hidden";
+      const ageMs = Date.now() - pos.ts;
+      if (ageMs <= MARKER_FRESH_MS) return "active";
+      if (ageMs <= RIDE_FRESH_MS) return "stale";
+      return "hidden";
+    }
+
+    function hasVisibleMarkerPosition(driverKey) {
+      return getDriverRouteState(driverKey) === "active";
     }
 
     function hasRidePositionWithinStaleWindow(driverKey) {
-      const pos = positions.get(driverKey);
-      if (!pos?.ts) return false;
-      return (Date.now() - pos.ts) <= STALE_MS;
+      return getDriverRouteState(driverKey) !== "hidden";
     }
 
     function getVisibleActiveRides() {
       return [...activeRides.entries()].filter(([, ride]) => {
         const driverKey = normId(ride.driver_id);
-        return !!driverKey && hasVisibleMarkerPosition(driverKey);
+        return !!driverKey && getDriverRouteState(driverKey) === "active";
       });
     }
 
@@ -1850,25 +1855,26 @@
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
         if (!driverKey) continue;
-        const isFresh = hasVisibleMarkerPosition(driverKey);
+        const routeState = getDriverRouteState(driverKey);
         const candidateTs = new Date(ride.updated_at || ride.created_at || 0).getTime() || 0;
         const prev = canonicalRideByDriver.get(driverKey);
+        const rank = routeState === "active" ? 2 : routeState === "stale" ? 1 : 0;
         if (!prev) {
-          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
+          canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
           continue;
         }
-        if (isFresh && !prev.isFresh) {
-          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
+        if (rank > prev.rank) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
           continue;
         }
-        if (isFresh === prev.isFresh && candidateTs > prev.candidateTs) {
-          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
+        if (rank === prev.rank && candidateTs > prev.candidateTs) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
         }
       }
 
-      for (const { rideId, ride, isFresh } of canonicalRideByDriver.values()) {
+      for (const { rideId, ride, routeState } of canonicalRideByDriver.values()) {
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
-        if (isFresh && !isValidLatLng(zLat, zLng)) continue;
+        if (routeState === "active" && !isValidLatLng(zLat, zLng)) continue;
 
         const props = {
           rideId,
@@ -1883,7 +1889,7 @@
         };
 
         // ── Ziel-Punkt (orange) ──
-        if (isFresh) {
+        if (routeState === "active") {
           destFeatures.push({
             type: "Feature",
             properties: props,
@@ -1917,8 +1923,9 @@
             properties: {
               rideId,
               driverId: ride.driver_id || "",
-              stale: isFresh ? 0 : 1,
-              color: isFresh ? "#B7D532" : "rgba(148,163,184,0.55)"
+              route_state: routeState,
+              stale: routeState === "stale" ? 1 : 0,
+              color: routeState === "active" ? "#B7D532" : "rgba(148,163,184,0.55)"
             },
             geometry: { type: "LineString", coordinates: coords }
           });
@@ -1964,11 +1971,7 @@
       const btnRoute = document.createElement("button");
       btnRoute.className = "er-pop-btn primary"; btnRoute.type = "button"; btnRoute.textContent = "Route anzeigen";
 
-      const btnCopy = document.createElement("button");
-      btnCopy.className = "er-pop-btn"; btnCopy.type = "button"; btnCopy.textContent = "Kopieren";
-
       actions.appendChild(btnRoute);
-      actions.appendChild(btnCopy);
       root.appendChild(title);
       root.appendChild(sub);
       root.appendChild(actions);
@@ -1993,13 +1996,6 @@
         refreshDriversSource();
         onVisibilityOrPanelChange();
       });
-      btnCopy.addEventListener("click", async (ev) => {
-        ev.preventDefault(); ev.stopPropagation();
-        const ok = await copyText(String(rawId));
-        showHint(ok ? "Driver ID kopiert." : "Kopieren nicht möglich.");
-        setTimeout(() => hideHint(), 1200);
-      });
-
       const coords = feature.geometry?.coordinates;
       if (!Array.isArray(coords) || coords.length !== 2) return;
       markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
