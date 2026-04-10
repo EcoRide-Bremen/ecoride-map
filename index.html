@@ -1851,6 +1851,27 @@
       if (map.getLayer(LAYER_POINTS)) map.setFilter(LAYER_POINTS, ["==", ["get", "driverKey"], "__none__"]);
       if (map.getLayer(LAYER_POINTS_SELECTED)) map.setFilter(LAYER_POINTS_SELECTED, ["==", ["get", "driverKey"], "__none__"]);
     }
+
+    function rebuildDriverRenderPathEmpty() {
+      if (!map) return;
+      if (map.getLayer(LAYER_POINTS_SELECTED)) map.removeLayer(LAYER_POINTS_SELECTED);
+      if (map.getLayer(LAYER_POINTS)) map.removeLayer(LAYER_POINTS);
+      if (map.getLayer(LAYER_CLUSTER_COUNT)) map.removeLayer(LAYER_CLUSTER_COUNT);
+      if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.removeLayer(LAYER_CLUSTER_CIRCLE);
+      if (map.getSource(DRIVERS_SOURCE)) map.removeSource(DRIVERS_SOURCE);
+
+      map.addSource(DRIVERS_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+        cluster: true,
+        clusterRadius: 45,
+        clusterMaxZoom: 14,
+      });
+      map.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-color":"#334155","circle-radius":["step",["get","point_count"],18,10,22,25,28],"circle-opacity":0.9}});
+      map.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-size":12},paint:{"text-color":"#fff"}});
+      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"#94a3b8","#22c55e"],"circle-stroke-color":"#0b0f14","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.55,0.95]}});
+      map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":10,"circle-color":"#B7D532","circle-stroke-color":"#fff","circle-stroke-width":2,"circle-opacity":0.98}});
+    }
     function refreshDriversSource() {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
       const feats = [];
@@ -2278,6 +2299,7 @@
           map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: [] });
         }
         snapshotMapState("rideEnd:after-source-set", driverKey);
+        rebuildDriverRenderPathEmpty();
         refreshDriversSource();
         refreshRoutesSource();
         refreshRidesSource();
