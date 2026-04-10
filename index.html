@@ -2364,8 +2364,8 @@
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (endedDrivers.has(driverKey)) {
           const endedAt = endedDriverAt.get(driverKey) || 0;
-          if (ts <= endedAt) {
-            logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt });
+          if (ts <= endedAt + 20_000) {
+            logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt, guardMs: 20000 });
             positions.clear();
             refreshDriversSource();
             return;
@@ -2401,8 +2401,8 @@
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (endedDrivers.has(key)) {
           const endedAt = endedDriverAt.get(key) || 0;
-          if (ts <= endedAt) {
-            logMapPath("fetchLatest:skip", { reason: "ended-driver", driverKey: key, ts, endedAt });
+          if (ts <= endedAt + 20_000) {
+            logMapPath("fetchLatest:skip", { reason: "ended-driver", driverKey: key, ts, endedAt, guardMs: 20000 });
             continue;
           }
           recentlyEnded.delete(key);
@@ -2738,7 +2738,7 @@
 
       if (endedDrivers.has(driverKey)) {
         const endedAt = endedDriverAt.get(driverKey) || 0;
-        if (ts <= endedAt) return; // altes/spätes Restsignal nach manuellem Ende ignorieren
+        if (ts <= endedAt + 20_000) return; // altes/spätes Restsignal nach manuellem Ende ignorieren
         recentlyEnded.delete(driverKey);
         endedDrivers.delete(driverKey);
         endedDriverAt.delete(driverKey);
