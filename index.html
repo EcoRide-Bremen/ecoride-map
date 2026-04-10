@@ -2487,7 +2487,9 @@
       }
       renderModeUI(); // Lock-Zustand aktualisieren
 
-      // Fahrer die nicht mehr in aktiven Rides sind → Marker sofort entfernen
+      // Fahrer die nicht mehr in aktiven Rides sind:
+      // Ride-/Routenpfad leeren, Marker-Positionen aber NICHT löschen.
+      // Marker sollen ausschließlich dem Live-Positionspfad folgen.
       const nowDriverKeys = new Set(
         [...activeRides.values()].map(r => normId(r.driver_id))
       );
@@ -2495,7 +2497,6 @@
       for (const driverKey of prevDriverKeys) {
         if (!nowDriverKeys.has(driverKey)) {
           endedDrivers.add(driverKey);
-          positions.delete(driverKey);
           routePoints.delete(driverKey);
           markerChanged = true;
         }
@@ -2508,21 +2509,22 @@
         }
       }
 
-      // Fix B: Reload-Bug – Positionen ohne aktive Fahrt bereinigen
-      // Schonfenster 10s: frisch gestartete Fahrten erscheinen kurz vor v_aktive_fahrten-JOIN
+      // Fix B: Ohne aktive Fahrt keine Ride-Route mehr zeigen,
+      // aber Marker nicht aus dem Ride-Pfad löschen.
       const now = Date.now();
       for (const [key, pos] of positions.entries()) {
         if (nowDriverKeys.has(key)) continue;
         if (recentlyEnded.has(key)) continue; // manuell gesperrt → bereits behandelt
         const posAge = now - (pos.ts ?? 0);
-        if (posAge < 10_000) continue; // Schonfenster: frische Position nicht sofort löschen
-        endedDrivers.add(key);
-        positions.delete(key);
-        routePoints.delete(key);
-        markerChanged = true;
+        if (posAge < 10_000) continue; // Schonfenster: frische Position nicht sofort anfassen
+        if (routePoints.has(key)) {
+          endedDrivers.add(key);
+          routePoints.delete(key);
+          markerChanged = true;
+        }
       }
 
-      if (markerChanged) { refreshDriversSource(); refreshRoutesSource(); }
+      if (markerChanged) { refreshRoutesSource(); }
 
       refreshRidesSource();
     }
