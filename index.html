@@ -1813,6 +1813,22 @@
           : ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], "__none__"]]
       );
     }
+
+    function applyDefaultDriverLayerFilters() {
+      if (!map) return;
+      if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.setFilter(LAYER_CLUSTER_CIRCLE, ["has", "point_count"]);
+      if (map.getLayer(LAYER_CLUSTER_COUNT)) map.setFilter(LAYER_CLUSTER_COUNT, ["has", "point_count"]);
+      if (map.getLayer(LAYER_POINTS)) map.setFilter(LAYER_POINTS, ["all", ["!", ["has", "point_count"]]]);
+      updateSelectedLayerFilter();
+    }
+
+    function hideAllDriverLayersImmediately() {
+      if (!map) return;
+      if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.setFilter(LAYER_CLUSTER_CIRCLE, ["==", ["get", "point_count"], -1]);
+      if (map.getLayer(LAYER_CLUSTER_COUNT)) map.setFilter(LAYER_CLUSTER_COUNT, ["==", ["get", "point_count"], -1]);
+      if (map.getLayer(LAYER_POINTS)) map.setFilter(LAYER_POINTS, ["==", ["get", "driverKey"], "__none__"]);
+      if (map.getLayer(LAYER_POINTS_SELECTED)) map.setFilter(LAYER_POINTS_SELECTED, ["==", ["get", "driverKey"], "__none__"]);
+    }
     function refreshDriversSource() {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
       const feats = [];
@@ -1848,6 +1864,7 @@
           geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
+      applyDefaultDriverLayerFilters();
       logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length });
       map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
       updateSelectedLayerFilter();
@@ -2222,6 +2239,8 @@
         for (const [rideId, ride] of [...activeRides.entries()]) {
           if (normId(ride.driver_id) === driverKey) activeRides.delete(rideId);
         }
+        hideAllDriverLayersImmediately();
+        clearSelection();
         if (map?.getSource?.(DRIVERS_SOURCE)) {
           map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
         }
