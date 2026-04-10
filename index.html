@@ -2222,9 +2222,19 @@
         for (const [rideId, ride] of [...activeRides.entries()]) {
           if (normId(ride.driver_id) === driverKey) activeRides.delete(rideId);
         }
+        if (map?.getSource?.(DRIVERS_SOURCE)) {
+          map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
+        }
+        if (map?.getSource?.(RIDES_ROUTE_SOURCE)) {
+          map.getSource(RIDES_ROUTE_SOURCE).setData({ type: "FeatureCollection", features: [] });
+        }
+        if (map?.getSource?.(RIDES_SOURCE)) {
+          map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: [] });
+        }
         refreshDriversSource();
         refreshRoutesSource();
         refreshRidesSource();
+        map?.triggerRepaint?.();
       }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
