@@ -2503,7 +2503,7 @@
 
       for (const [rideId, ride] of [...activeRides.entries()]) {
         const driverKey = normId(ride.driver_id);
-        if (!driverKey || !hasFreshDriverPosition(driverKey)) {
+        if (!driverKey || !hasRidePositionWithinStaleWindow(driverKey)) {
           activeRides.delete(rideId);
         }
       }
