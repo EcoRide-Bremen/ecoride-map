@@ -844,6 +844,24 @@
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
     function logMapPath(...args) { console.log("[MAP_PATH]", new Date().toISOString(), ...args); }
+    function snapshotMapState(label, driverKey = null) {
+      const driverSource = map?.getSource?.(DRIVERS_SOURCE);
+      const driversData = driverSource?._data;
+      const driverFeatures = Array.isArray(driversData?.features) ? driversData.features.length : null;
+      const pos = driverKey ? positions.get(driverKey) : null;
+      logMapPath(label, {
+        driverKey,
+        positionsSize: positions.size,
+        activeRidesSize: activeRides.size,
+        routePointsSize: routePoints.size,
+        endedDriversSize: endedDrivers.size,
+        recentlyEndedSize: recentlyEnded.size,
+        currentFilterKey,
+        driverFeatures,
+        hasPosition: !!pos,
+        positionTs: pos?.ts || null
+      });
+    }
     function logError(code, message, ctx = {}) {
       console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
     }
@@ -2230,6 +2248,7 @@
     function resetImpactCounters(driverKey) {
       manualEndedAt = Date.now();
       if (driverKey) {
+        snapshotMapState("rideEnd:before-cleanup", driverKey);
         manualEndedDriverKey = driverKey;
         recentlyEnded.add(driverKey);
         endedDrivers.add(driverKey);
@@ -2239,6 +2258,7 @@
         for (const [rideId, ride] of [...activeRides.entries()]) {
           if (normId(ride.driver_id) === driverKey) activeRides.delete(rideId);
         }
+        snapshotMapState("rideEnd:after-state-cleanup", driverKey);
         hideAllDriverLayersImmediately();
         clearSelection();
         if (map?.getSource?.(DRIVERS_SOURCE)) {
@@ -2250,10 +2270,14 @@
         if (map?.getSource?.(RIDES_SOURCE)) {
           map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: [] });
         }
+        snapshotMapState("rideEnd:after-source-set", driverKey);
         refreshDriversSource();
         refreshRoutesSource();
         refreshRidesSource();
         map?.triggerRepaint?.();
+        setTimeout(() => snapshotMapState("rideEnd:+1s", driverKey), 1000);
+        setTimeout(() => snapshotMapState("rideEnd:+5s", driverKey), 5000);
+        setTimeout(() => snapshotMapState("rideEnd:+10s", driverKey), 10000);
       }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
