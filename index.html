@@ -926,6 +926,7 @@
     const activeRides = new Map(); // NEU: rideId → v_aktive_fahrten row
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
+    const endedDriverAt = new Map(); // driverKey -> Zeitstempel des manuellen Endes
 
     function getDriverRouteState(driverKey) {
       const pos = positions.get(driverKey);
@@ -2214,20 +2215,34 @@
       if (driverKey) {
         manualEndedDriverKey = driverKey;
         recentlyEnded.add(driverKey);
+        endedDrivers.add(driverKey);
+        endedDriverAt.set(driverKey, manualEndedAt);
+        positions.delete(driverKey);
+        routePoints.delete(driverKey);
+        for (const [rideId, ride] of [...activeRides.entries()]) {
+          if (normId(ride.driver_id) === driverKey) activeRides.delete(rideId);
+        }
+        refreshDriversSource();
+        refreshRoutesSource();
+        refreshRidesSource();
       }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
       const rideCount   = getVisibleActiveRides().length;
       setSafeTextContent("impactActive",   String(getActiveDriverCount()));
       setSafeTextContent("impactPoints10", "0");
-      setSafeTextContent("impactMarkers",  String(positions.size));
+      setSafeTextContent("impactMarkers",  String(getVisiblePositionsCount()));
       setSafeTextContent("rideCountTxt",   String(rideCount));
       pulse("impactActive");
       // Erst nach 3 Min. wieder pollen (DB-Zeitfenster abgelaufen)
       setTimeout(() => {
         manualEndedAt = 0;
         manualEndedDriverKey = null;
-        if (driverKey) recentlyEnded.delete(driverKey);
+        if (driverKey) {
+          recentlyEnded.delete(driverKey);
+          endedDrivers.delete(driverKey);
+          endedDriverAt.delete(driverKey);
+        }
         scheduleImpactPoll();
       }, 3 * 60_000);
     }
@@ -2337,10 +2352,16 @@
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         if (endedDrivers.has(driverKey)) {
-          logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey });
-          positions.clear();
-          refreshDriversSource();
-          return;
+          const endedAt = endedDriverAt.get(driverKey) || 0;
+          if (ts <= endedAt) {
+            logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt });
+            positions.clear();
+            refreshDriversSource();
+            return;
+          }
+          recentlyEnded.delete(driverKey);
+          endedDrivers.delete(driverKey);
+          endedDriverAt.delete(driverKey);
         }
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
@@ -2367,7 +2388,16 @@
         const rawId = (row?.driver_id ?? "").toString();
         const key = normId(rawId);
         if (!key) { logMapPath("fetchLatest:skip", { reason: "empty-normalized-driverKey", rawId }); continue; }
-        if (endedDrivers.has(key)) { logMapPath("fetchLatest:skip", { reason: "ended-driver", driverKey: key }); continue; }
+        if (endedDrivers.has(key)) {
+          const endedAt = endedDriverAt.get(key) || 0;
+          if (ts <= endedAt) {
+            logMapPath("fetchLatest:skip", { reason: "ended-driver", driverKey: key, ts, endedAt });
+            continue;
+          }
+          recentlyEnded.delete(key);
+          endedDrivers.delete(key);
+          endedDriverAt.delete(key);
+        }
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip", { reason: "invalid-lat-lng", driverKey: key, lat, lng }); continue; }
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
@@ -2498,6 +2528,7 @@
         if (recentlyEnded.has(driverKey) || endedDrivers.has(driverKey)) {
           recentlyEnded.delete(driverKey);
           endedDrivers.delete(driverKey);
+          endedDriverAt.delete(driverKey);
           reactivatedDrivers.add(driverKey); // Position fehlt → fetchLatest nötig
         }
         if (positions.size > 0 && !positions.has(driverKey)) continue;
