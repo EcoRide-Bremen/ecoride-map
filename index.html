@@ -1605,7 +1605,7 @@
         const candidates = [];
         for (const [driverKey, pos] of positions.entries()) {
           if (endedDrivers.has(driverKey)) continue;
-          if (now - (pos.ts || 0) > STALE_MS) continue;
+          if (now - (pos.ts || 0) > RIDE_FRESH_MS) continue;
           const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
           if (distKm > radiusKm) continue;
           if (!driverHeadsTowardTarget(driverKey)) continue;
@@ -1839,7 +1839,7 @@
           }
         }
         const ageMs = (now - (p.ts || now));
-        const stale = ageMs > STALE_VISUAL_MS;
+        const stale = ageMs > MARKER_FRESH_MS;
         logMapPath("refreshDriversSource:keep", { driverKey, rawId: p.rawId, lat: p.lat, lng: p.lng, ts: p.ts, ageMs, stale });
         feats.push({
           type: "Feature",
@@ -1969,7 +1969,7 @@
       const rawId  = props.rawId || props.driverKey || "";
       const ts     = Number(props.ts) || Date.now();
       const ageMs  = Date.now() - ts;
-      const isStale = ageMs > STALE_VISUAL_MS;
+      const isStale = ageMs > MARKER_FRESH_MS;
 
       const root   = document.createElement("div");
       const title  = document.createElement("div");
@@ -2319,8 +2319,8 @@
     async function fetchLatest(cutoffOverride) {
       const seq = ++latestFetchSeq;
       const now = Date.now();
-      // Bug 3: immer STALE_MS als Fetch-Cutoff – activeOnlyMode filtert client-seitig via activeRides
-      const fallbackIso = new Date(now - STALE_MS).toISOString();
+      // Fetch-Cutoff am Ride-Fenster ausrichten, Marker-Frische wird danach separat geprüft
+      const fallbackIso = new Date(now - RIDE_FRESH_MS).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
       if (currentFilterKey) {
@@ -2347,7 +2347,7 @@
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
-        if (ageMs > STALE_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: STALE_MS }); return; }
+        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); return; }
         positions.clear();
         positions.set(driverKey, { rawId, lng, lat, ts });
         logMapPath("fetchLatest:set(filter)", { driverKey, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
@@ -2373,7 +2373,7 @@
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
-        if (ageMs > STALE_MS) { logMapPath("fetchLatest:skip", { reason: "stale-position", driverKey: key, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: STALE_MS }); continue; }
+        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip", { reason: "stale-position", driverKey: key, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); continue; }
         positions.set(key, { rawId: row.driver_id, lng, lat, ts });
         logMapPath("fetchLatest:set", { driverKey: key, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
       }
@@ -2436,7 +2436,7 @@
         while (arr.length && arr[0].ts < minTs) arr.shift();
         if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
         const last = arr[arr.length - 1];
-        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) routePoints.delete(driverKey);
+        if (!last || (now - last.ts > RIDE_FRESH_MS) || arr.length < 2) routePoints.delete(driverKey);
       }
       refreshRoutesSource();
     }
@@ -2459,7 +2459,7 @@
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) return;
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        if (Date.now() - ts > STALE_MS) return; // Position zu alt
+        if (Date.now() - ts > RIDE_FRESH_MS) return; // Position zu alt
         const rawId = (row.driver_id ?? "").toString();
         positions.set(driverKey, { rawId, lng, lat, ts });
         logDebug("fetchPositionWithRetry: Position gesetzt (Versuch", i + 1, "):", driverKey);
@@ -2694,7 +2694,7 @@
       const lat = Number(row.lat), lng = Number(row.lng);
       if (!isValidLatLng(lat, lng)) return;
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-      if (Date.now() - ts > STALE_MS) return;
+      if (Date.now() - ts > RIDE_FRESH_MS) return;
 
       if (currentFilterKey) {
         if (driverKey !== currentFilterKey) return;
@@ -2727,7 +2727,7 @@
 
       // 1. Stale Fahrer-Positionen entfernen
       for (const [key, p] of positions.entries()) {
-        if (now - (p?.ts || 0) > STALE_MS) {
+        if (now - (p?.ts || 0) > RIDE_FRESH_MS) {
           positions.delete(key);
           routePoints.delete(key);
           driversChanged = true;
