@@ -843,6 +843,7 @@
     // ─────────────────────────────────────────────────
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
+    function logMapPath(...args) { console.log("[MAP_PATH]", new Date().toISOString(), ...args); }
     function logError(code, message, ctx = {}) {
       console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
     }
@@ -1815,22 +1816,38 @@
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
       const feats = [];
       const now = Date.now();
+      logMapPath("refreshDriversSource:start", { positionsSize: positions.size, currentFilterKey, activeOnlyMode, activeRidesSize: activeRides.size, endedDriversSize: endedDrivers.size });
       for (const [driverKey, p] of positions.entries()) {
-        if (!p) continue;
-        if (endedDrivers.has(driverKey)) continue;
-        if (currentFilterKey && driverKey !== currentFilterKey) continue;
+        if (!p) {
+          logMapPath("refreshDriversSource:skip", { driverKey, reason: "missing-position" });
+          continue;
+        }
+        if (endedDrivers.has(driverKey)) {
+          logMapPath("refreshDriversSource:skip", { driverKey, reason: "ended-driver" });
+          continue;
+        }
+        if (currentFilterKey && driverKey !== currentFilterKey) {
+          logMapPath("refreshDriversSource:skip", { driverKey, reason: "filter-mismatch", currentFilterKey });
+          continue;
+        }
         // Bug 3: Aktive-Modus = nur Fahrer mit aktiver Fahrt in activeRides
         if (activeOnlyMode && !currentFilterKey) {
           const hasRide = [...activeRides.values()].some(r => normId(r.driver_id) === driverKey);
-          if (!hasRide) continue;
+          if (!hasRide) {
+            logMapPath("refreshDriversSource:skip", { driverKey, reason: "active-only-without-ride" });
+            continue;
+          }
         }
-        const stale = (now - (p.ts || now)) > STALE_VISUAL_MS;
+        const ageMs = (now - (p.ts || now));
+        const stale = ageMs > STALE_VISUAL_MS;
+        logMapPath("refreshDriversSource:keep", { driverKey, rawId: p.rawId, lat: p.lat, lng: p.lng, ts: p.ts, ageMs, stale });
         feats.push({
           type: "Feature",
           properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0 },
           geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
+      logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length });
       map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
       updateSelectedLayerFilter();
       setCount(feats.length);
@@ -2314,21 +2331,26 @@
           .gte("updated_at", cutoffIso).limit(1);
         if (seq !== latestFetchSeq) return;
         if (error) { logError("ERR_FETCH_LATEST_FOLLOW_V", error.message); showHint("Fehler beim Laden."); return; }
+        logMapPath("fetchLatest:rows(filter)", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
         const row = data?.[0] ?? null;
-        if (!row) { showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
+        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         if (endedDrivers.has(driverKey)) {
+          logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey });
           positions.clear();
           refreshDriversSource();
           return;
         }
         const lat = Number(row.lat), lng = Number(row.lng);
-        if (!isValidLatLng(lat, lng)) return;
+        if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        if (Date.now() - ts > STALE_MS) return;
+        const nowMs = Date.now();
+        const ageMs = nowMs - ts;
+        if (ageMs > STALE_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: STALE_MS }); return; }
         positions.clear();
         positions.set(driverKey, { rawId, lng, lat, ts });
+        logMapPath("fetchLatest:set(filter)", { driverKey, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
         map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
         setLast(new Date()); refreshDriversSource();
         return;
@@ -2339,16 +2361,21 @@
         .limit(BBOX_LIMIT_LATEST);
       if (seq !== latestFetchSeq) return;
       if (error) { logError("ERR_FETCH_LATEST_BBOX_V", error.message); showHint("Fehler beim Laden."); return; }
+      logMapPath("fetchLatest:rows", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
       positions.clear();
       for (const row of data || []) {
         const rawId = (row?.driver_id ?? "").toString();
-        const key = normId(rawId); if (!key) continue;
-        if (endedDrivers.has(key)) continue;
+        const key = normId(rawId);
+        if (!key) { logMapPath("fetchLatest:skip", { reason: "empty-normalized-driverKey", rawId }); continue; }
+        if (endedDrivers.has(key)) { logMapPath("fetchLatest:skip", { reason: "ended-driver", driverKey: key }); continue; }
         const lat = Number(row.lat), lng = Number(row.lng);
-        if (!isValidLatLng(lat, lng)) continue;
+        if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip", { reason: "invalid-lat-lng", driverKey: key, lat, lng }); continue; }
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        if (Date.now() - ts > STALE_MS) continue;
+        const nowMs = Date.now();
+        const ageMs = nowMs - ts;
+        if (ageMs > STALE_MS) { logMapPath("fetchLatest:skip", { reason: "stale-position", driverKey: key, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: STALE_MS }); continue; }
         positions.set(key, { rawId: row.driver_id, lng, lat, ts });
+        logMapPath("fetchLatest:set", { driverKey: key, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
       }
       setLast(new Date()); refreshDriversSource();
     }
