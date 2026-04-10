@@ -2351,6 +2351,7 @@
         if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (endedDrivers.has(driverKey)) {
           const endedAt = endedDriverAt.get(driverKey) || 0;
           if (ts <= endedAt) {
@@ -2365,7 +2366,6 @@
         }
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
         if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); return; }
@@ -2388,6 +2388,7 @@
         const rawId = (row?.driver_id ?? "").toString();
         const key = normId(rawId);
         if (!key) { logMapPath("fetchLatest:skip", { reason: "empty-normalized-driverKey", rawId }); continue; }
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (endedDrivers.has(key)) {
           const endedAt = endedDriverAt.get(key) || 0;
           if (ts <= endedAt) {
@@ -2400,7 +2401,6 @@
         }
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip", { reason: "invalid-lat-lng", driverKey: key, lat, lng }); continue; }
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
         if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip", { reason: "stale-position", driverKey: key, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); continue; }
@@ -2728,7 +2728,7 @@
 
       if (endedDrivers.has(driverKey)) {
         const endedAt = endedDriverAt.get(driverKey) || 0;
-        if (ts <= endedAt + 5000) return; // altes/spätes Restsignal nach manuellem Ende ignorieren
+        if (ts <= endedAt) return; // altes/spätes Restsignal nach manuellem Ende ignorieren
         recentlyEnded.delete(driverKey);
         endedDrivers.delete(driverKey);
         endedDriverAt.delete(driverKey);
