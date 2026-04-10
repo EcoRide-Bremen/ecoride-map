@@ -2721,18 +2721,23 @@
       if (!map || !row?.driver_id) return;
       const rawId = (row.driver_id ?? "").toString();
       const driverKey = normId(rawId); if (!driverKey) return;
-      if (endedDrivers.has(driverKey)) return;
       const lat = Number(row.lat), lng = Number(row.lng);
       if (!isValidLatLng(lat, lng)) return;
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
       if (Date.now() - ts > RIDE_FRESH_MS) return;
 
+      if (endedDrivers.has(driverKey)) {
+        const endedAt = endedDriverAt.get(driverKey) || 0;
+        if (ts <= endedAt + 5000) return; // altes/spätes Restsignal nach manuellem Ende ignorieren
+        recentlyEnded.delete(driverKey);
+        endedDrivers.delete(driverKey);
+        endedDriverAt.delete(driverKey);
+      }
+
       if (currentFilterKey) {
         if (driverKey !== currentFilterKey) return;
         positions.set(driverKey, { rawId, lng, lat, ts });
       } else {
-        const bb = getBoundsBBoxPadded();
-        if (bb && !isInBbox(bb, lng, lat)) return;
         positions.set(driverKey, { rawId, lng, lat, ts });
       }
 
