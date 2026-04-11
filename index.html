@@ -1034,23 +1034,29 @@
     }
 
     function renderModeUI() {
-      const btnDriver    = document.getElementById("btnModeDriver");
-      const btnPassenger = document.getElementById("btnModePassenger");
-      const driverPanel  = document.getElementById("driverPanel");
+      const btnDriver      = document.getElementById("btnModeDriver");
+      const btnPassenger   = document.getElementById("btnModePassenger");
+      const driverPanel    = document.getElementById("driverPanel");
       const passengerPanel = document.getElementById("passengerPanel");
-      if (!btnDriver) return;
+      if (!btnDriver || !btnPassenger || !driverPanel || !passengerPanel) return;
 
       const locked = isModeLocked();
+      const isDriverMode = appMode === "driver";
+      const isPassengerMode = appMode === "passenger";
 
-      btnDriver.classList.toggle("active", appMode === "driver");
-      btnPassenger.classList.toggle("active", appMode === "passenger");
+      btnDriver.classList.toggle("active", isDriverMode);
+      btnPassenger.classList.toggle("active", isPassengerMode);
+      btnDriver.setAttribute("aria-pressed", isDriverMode ? "true" : "false");
+      btnPassenger.setAttribute("aria-pressed", isPassengerMode ? "true" : "false");
 
       // Anderer Modus-Button sperren wenn aktive Session
-      btnDriver.disabled    = locked && appMode !== "driver";
-      btnPassenger.disabled = locked && appMode !== "passenger";
+      btnDriver.disabled    = locked && !isDriverMode;
+      btnPassenger.disabled = locked && !isPassengerMode;
 
-      driverPanel.style.display    = appMode === "driver"    ? "" : "none";
-      passengerPanel.style.display = appMode === "passenger" ? "" : "none";
+      driverPanel.style.display    = isDriverMode ? "" : "none";
+      passengerPanel.style.display = isPassengerMode ? "" : "none";
+      driverPanel.setAttribute("aria-hidden", isDriverMode ? "false" : "true");
+      passengerPanel.setAttribute("aria-hidden", isPassengerMode ? "false" : "true");
     }
 
     document.getElementById("btnModeDriver")?.addEventListener("click",    () => setMode("driver"));
@@ -1829,6 +1835,7 @@
       }
       map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
       updateSelectedLayerFilter();
+      renderModeUI();
       setCount(feats.length);
       setSafeTextContent("impactMarkers", String(feats.length));
       pulse("impactMarkers");
@@ -1932,6 +1939,7 @@
 
       setSafeTextContent("rideCountTxt", String(destFeatures.length));
       pulse("rideCountTxt");
+      renderModeUI();
     }
 
     // ─────────────────────────────────────────────────
