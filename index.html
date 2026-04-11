@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- PHASE 2 ACTIVE: Dies ist ab jetzt die einzige aktive Master-Datei fuer die EcoRide Live-Karte.
+     Live-Karten-Bugfixes nur noch hier vornehmen: /home/threeothree/ecoride-map/index.html -->
 <html lang="de">
 <head>
   <meta charset="utf-8" />
@@ -836,6 +838,7 @@
   </div>
 
   <!-- Lokale Keys: config.js wird nicht in Git eingecheckt -->
+  <script src="config.js"></script>
 
   <script>
     // ─────────────────────────────────────────────────
@@ -843,29 +846,6 @@
     // ─────────────────────────────────────────────────
     const DEBUG = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     function logDebug(...args) { if (DEBUG) console.log("[DEBUG]", new Date().toISOString(), ...args); }
-    function logMapPath(...args) { console.log("[MAP_PATH]", new Date().toISOString(), ...args); }
-    function getDriverSourceFeatureCount() {
-      const driverSource = map?.getSource?.(DRIVERS_SOURCE);
-      const driversData = driverSource?._data;
-      return Array.isArray(driversData?.features) ? driversData.features.length : null;
-    }
-
-    function snapshotMapState(label, driverKey = null) {
-      const driverFeatures = getDriverSourceFeatureCount();
-      const pos = driverKey ? positions.get(driverKey) : null;
-      logMapPath(label, {
-        driverKey,
-        positionsSize: positions.size,
-        activeRidesSize: activeRides.size,
-        routePointsSize: routePoints.size,
-        endedDriversSize: endedDrivers.size,
-        recentlyEndedSize: recentlyEnded.size,
-        currentFilterKey,
-        driverFeatures,
-        hasPosition: !!pos,
-        positionTs: pos?.ts || null
-      });
-    }
     function logError(code, message, ctx = {}) {
       console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
     }
@@ -878,18 +858,18 @@
     // ─────────────────────────────────────────────────
     // CONFIG
     // ─────────────────────────────────────────────────
-   const CONFIG = {
-    mapboxToken: "pk.eyJ1IjoicGFwYXZlcm8iLCJhIjoiY21uZ2RkeHRvMDF4eTJzc2Q0M2hmdjgxaCJ9.KCbrjDP2qAYTkj82kEkYXg",
-    supabaseUrl: "https://ihpszsoivqcrkkiucjvv.supabase.co",
-    supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlocHN6c29pdnFjcmtraXVjanZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0NjMyNDAsImV4cCI6MjA3NDAzOTI0MH0.RTqNvbND-SlW-ekKGsXEO5CY0ai8zgvQwRm_17WtUmw",
-  };
+    const CONFIG = window.ER_CONFIG ?? {
+      mapboxToken:     "MAPBOX_TOKEN_PLACEHOLDER",
+      supabaseUrl:     "https://ihpszsoivqcrkkiucjvv.supabase.co",
+      supabaseAnonKey: "SUPABASE_KEY_PLACEHOLDER",
+    };
 
     // ─────────────────────────────────────────────────
     // KONSTANTEN
     // ─────────────────────────────────────────────────
     const ACTIVE_ONLY_MS        = 2  * 60_000;
-    const MARKER_FRESH_MS       = 2  * 60_000;
-    const RIDE_FRESH_MS         = 5  * 60_000;
+    const STALE_VISUAL_MS       = 2  * 60_000;
+    const STALE_MS              = 5  * 60_000;
     const PRUNE_EVERY_MS        = 10_000;
     const ROUTE_MS              = 10 * 60_000;
     const MAX_POINTS            = 200;
@@ -948,29 +928,19 @@
     const activeRides = new Map(); // NEU: rideId → v_aktive_fahrten row
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
-    const endedDriverAt = new Map(); // driverKey -> Zeitstempel des manuellen Endes
 
-    function getDriverRouteState(driverKey) {
+    function hasFreshDriverPosition(driverKey) {
       const pos = positions.get(driverKey);
-      if (!pos?.ts) return "hidden";
-      const ageMs = Date.now() - pos.ts;
-      if (ageMs <= MARKER_FRESH_MS) return "active";
-      if (ageMs <= RIDE_FRESH_MS) return "stale";
-      return "hidden";
-    }
-
-    function hasVisibleMarkerPosition(driverKey) {
-      return getDriverRouteState(driverKey) === "active";
-    }
-
-    function hasRidePositionWithinStaleWindow(driverKey) {
-      return getDriverRouteState(driverKey) !== "hidden";
+      if (!pos?.ts) return false;
+      // Dieselbe Frischegrenze wie der Fahrer-Marker, damit Marker und Route
+      // sichtbar immer denselben Zustand haben.
+      return (Date.now() - pos.ts) <= STALE_VISUAL_MS;
     }
 
     function getVisibleActiveRides() {
       return [...activeRides.entries()].filter(([, ride]) => {
         const driverKey = normId(ride.driver_id);
-        return !!driverKey && getDriverRouteState(driverKey) === "active";
+        return !!driverKey && hasFreshDriverPosition(driverKey);
       });
     }
 
@@ -1628,7 +1598,7 @@
         const candidates = [];
         for (const [driverKey, pos] of positions.entries()) {
           if (endedDrivers.has(driverKey)) continue;
-          if (now - (pos.ts || 0) > RIDE_FRESH_MS) continue;
+          if (now - (pos.ts || 0) > STALE_MS) continue;
           const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
           if (distKm > radiusKm) continue;
           if (!driverHeadsTowardTarget(driverKey)) continue;
@@ -1835,82 +1805,29 @@
           : ["all", ["!", ["has", "point_count"]], ["==", ["get", "driverKey"], "__none__"]]
       );
     }
-
-    function applyDefaultDriverLayerFilters() {
-      if (!map) return;
-      if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.setFilter(LAYER_CLUSTER_CIRCLE, ["has", "point_count"]);
-      if (map.getLayer(LAYER_CLUSTER_COUNT)) map.setFilter(LAYER_CLUSTER_COUNT, ["has", "point_count"]);
-      if (map.getLayer(LAYER_POINTS)) map.setFilter(LAYER_POINTS, ["all", ["!", ["has", "point_count"]]]);
-      updateSelectedLayerFilter();
-    }
-
-    function hideAllDriverLayersImmediately() {
-      if (!map) return;
-      if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.setFilter(LAYER_CLUSTER_CIRCLE, ["==", ["get", "point_count"], -1]);
-      if (map.getLayer(LAYER_CLUSTER_COUNT)) map.setFilter(LAYER_CLUSTER_COUNT, ["==", ["get", "point_count"], -1]);
-      if (map.getLayer(LAYER_POINTS)) map.setFilter(LAYER_POINTS, ["==", ["get", "driverKey"], "__none__"]);
-      if (map.getLayer(LAYER_POINTS_SELECTED)) map.setFilter(LAYER_POINTS_SELECTED, ["==", ["get", "driverKey"], "__none__"]);
-    }
-
-    function rebuildDriverRenderPathEmpty() {
-      if (!map) return;
-      if (map.getLayer(LAYER_POINTS_SELECTED)) map.removeLayer(LAYER_POINTS_SELECTED);
-      if (map.getLayer(LAYER_POINTS)) map.removeLayer(LAYER_POINTS);
-      if (map.getLayer(LAYER_CLUSTER_COUNT)) map.removeLayer(LAYER_CLUSTER_COUNT);
-      if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.removeLayer(LAYER_CLUSTER_CIRCLE);
-      if (map.getSource(DRIVERS_SOURCE)) map.removeSource(DRIVERS_SOURCE);
-
-      map.addSource(DRIVERS_SOURCE, {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-        cluster: true,
-        clusterRadius: 45,
-        clusterMaxZoom: 14,
-      });
-      map.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-color":"#334155","circle-radius":["step",["get","point_count"],18,10,22,25,28],"circle-opacity":0.9}});
-      map.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-size":12},paint:{"text-color":"#fff"}});
-      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"#94a3b8","#22c55e"],"circle-stroke-color":"#0b0f14","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.55,0.95]}});
-      map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":10,"circle-color":"#B7D532","circle-stroke-color":"#fff","circle-stroke-width":2,"circle-opacity":0.98}});
-    }
     function refreshDriversSource() {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
       const feats = [];
       const now = Date.now();
-      logMapPath("refreshDriversSource:start", { positionsSize: positions.size, currentFilterKey, activeOnlyMode, activeRidesSize: activeRides.size, endedDriversSize: endedDrivers.size });
+      const bb = currentFilterKey ? null : getBoundsBBoxPadded();
       for (const [driverKey, p] of positions.entries()) {
-        if (!p) {
-          logMapPath("refreshDriversSource:skip", { driverKey, reason: "missing-position" });
-          continue;
-        }
-        if (endedDrivers.has(driverKey)) {
-          logMapPath("refreshDriversSource:skip", { driverKey, reason: "ended-driver" });
-          continue;
-        }
-        if (currentFilterKey && driverKey !== currentFilterKey) {
-          logMapPath("refreshDriversSource:skip", { driverKey, reason: "filter-mismatch", currentFilterKey });
-          continue;
-        }
+        if (!p) continue;
+        if (endedDrivers.has(driverKey)) continue;
+        if (currentFilterKey && driverKey !== currentFilterKey) continue;
+        if (!currentFilterKey && bb && !isInBbox(bb, Number(p.lng), Number(p.lat))) continue;
         // Bug 3: Aktive-Modus = nur Fahrer mit aktiver Fahrt in activeRides
         if (activeOnlyMode && !currentFilterKey) {
           const hasRide = [...activeRides.values()].some(r => normId(r.driver_id) === driverKey);
-          if (!hasRide) {
-            logMapPath("refreshDriversSource:skip", { driverKey, reason: "active-only-without-ride" });
-            continue;
-          }
+          if (!hasRide) continue;
         }
-        const ageMs = (now - (p.ts || now));
-        const stale = ageMs > MARKER_FRESH_MS;
-        logMapPath("refreshDriversSource:keep", { driverKey, rawId: p.rawId, lat: p.lat, lng: p.lng, ts: p.ts, ageMs, stale });
+        const stale = (now - (p.ts || now)) > STALE_VISUAL_MS;
         feats.push({
           type: "Feature",
           properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0 },
           geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
-      applyDefaultDriverLayerFilters();
-      logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length, sourceFeatureCountBefore: getDriverSourceFeatureCount() });
       map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
-      logMapPath("refreshDriversSource:after-setData", { markerFeatures: feats.length, sourceFeatureCountAfter: getDriverSourceFeatureCount() });
       updateSelectedLayerFilter();
       setCount(feats.length);
       setSafeTextContent("impactMarkers", String(feats.length));
@@ -1932,26 +1849,25 @@
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
         if (!driverKey) continue;
-        const routeState = getDriverRouteState(driverKey);
+        const isFresh = hasFreshDriverPosition(driverKey);
         const candidateTs = new Date(ride.updated_at || ride.created_at || 0).getTime() || 0;
         const prev = canonicalRideByDriver.get(driverKey);
-        const rank = routeState === "active" ? 2 : routeState === "stale" ? 1 : 0;
         if (!prev) {
-          canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
+          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
           continue;
         }
-        if (rank > prev.rank) {
-          canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
+        if (isFresh && !prev.isFresh) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
           continue;
         }
-        if (rank === prev.rank && candidateTs > prev.candidateTs) {
-          canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
+        if (isFresh === prev.isFresh && candidateTs > prev.candidateTs) {
+          canonicalRideByDriver.set(driverKey, { rideId, ride, isFresh, candidateTs });
         }
       }
 
-      for (const { rideId, ride, routeState } of canonicalRideByDriver.values()) {
+      for (const { rideId, ride, isFresh } of canonicalRideByDriver.values()) {
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
-        if (routeState === "active" && !isValidLatLng(zLat, zLng)) continue;
+        if (isFresh && !isValidLatLng(zLat, zLng)) continue;
 
         const props = {
           rideId,
@@ -1966,7 +1882,7 @@
         };
 
         // ── Ziel-Punkt (orange) ──
-        if (routeState === "active") {
+        if (isFresh) {
           destFeatures.push({
             type: "Feature",
             properties: props,
@@ -2000,9 +1916,8 @@
             properties: {
               rideId,
               driverId: ride.driver_id || "",
-              route_state: routeState,
-              stale: routeState === "stale" ? 1 : 0,
-              color: routeState === "active" ? "#B7D532" : "rgba(148,163,184,0.55)"
+              stale: isFresh ? 0 : 1,
+              color: isFresh ? "#B7D532" : "rgba(148,163,184,0.55)"
             },
             geometry: { type: "LineString", coordinates: coords }
           });
@@ -2031,7 +1946,7 @@
       const rawId  = props.rawId || props.driverKey || "";
       const ts     = Number(props.ts) || Date.now();
       const ageMs  = Date.now() - ts;
-      const isStale = ageMs > MARKER_FRESH_MS;
+      const isStale = ageMs > STALE_VISUAL_MS;
 
       const root   = document.createElement("div");
       const title  = document.createElement("div");
@@ -2048,7 +1963,11 @@
       const btnRoute = document.createElement("button");
       btnRoute.className = "er-pop-btn primary"; btnRoute.type = "button"; btnRoute.textContent = "Route anzeigen";
 
+      const btnCopy = document.createElement("button");
+      btnCopy.className = "er-pop-btn"; btnCopy.type = "button"; btnCopy.textContent = "Kopieren";
+
       actions.appendChild(btnRoute);
+      actions.appendChild(btnCopy);
       root.appendChild(title);
       root.appendChild(sub);
       root.appendChild(actions);
@@ -2073,6 +1992,13 @@
         refreshDriversSource();
         onVisibilityOrPanelChange();
       });
+      btnCopy.addEventListener("click", async (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        const ok = await copyText(String(rawId));
+        showHint(ok ? "Driver ID kopiert." : "Kopieren nicht möglich.");
+        setTimeout(() => hideHint(), 1200);
+      });
+
       const coords = feature.geometry?.coordinates;
       if (!Array.isArray(coords) || coords.length !== 2) return;
       markerPopup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, offset: 14 })
@@ -2274,57 +2200,22 @@
     function resetImpactCounters(driverKey) {
       manualEndedAt = Date.now();
       if (driverKey) {
-        snapshotMapState("rideEnd:before-cleanup", driverKey);
         manualEndedDriverKey = driverKey;
         recentlyEnded.add(driverKey);
-        endedDrivers.add(driverKey);
-        endedDriverAt.set(driverKey, manualEndedAt);
-        positions.delete(driverKey);
-        routePoints.delete(driverKey);
-        for (const [rideId, ride] of [...activeRides.entries()]) {
-          if (normId(ride.driver_id) === driverKey) activeRides.delete(rideId);
-        }
-        snapshotMapState("rideEnd:after-state-cleanup", driverKey);
-        hideAllDriverLayersImmediately();
-        clearSelection();
-        if (map?.getSource?.(DRIVERS_SOURCE)) {
-          logMapPath("rideEnd:driver-source-before-empty", { sourceFeatureCountBefore: getDriverSourceFeatureCount() });
-          map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
-          logMapPath("rideEnd:driver-source-after-empty", { sourceFeatureCountAfter: getDriverSourceFeatureCount() });
-        }
-        if (map?.getSource?.(RIDES_ROUTE_SOURCE)) {
-          map.getSource(RIDES_ROUTE_SOURCE).setData({ type: "FeatureCollection", features: [] });
-        }
-        if (map?.getSource?.(RIDES_SOURCE)) {
-          map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: [] });
-        }
-        snapshotMapState("rideEnd:after-source-set", driverKey);
-        rebuildDriverRenderPathEmpty();
-        refreshDriversSource();
-        refreshRoutesSource();
-        refreshRidesSource();
-        map?.triggerRepaint?.();
-        setTimeout(() => snapshotMapState("rideEnd:+1s", driverKey), 1000);
-        setTimeout(() => snapshotMapState("rideEnd:+5s", driverKey), 5000);
-        setTimeout(() => snapshotMapState("rideEnd:+10s", driverKey), 10000);
       }
       // Timer stoppen damit kein Poll den Wert sofort überschreibt
       clearImpactTimer();
       const rideCount   = getVisibleActiveRides().length;
       setSafeTextContent("impactActive",   String(getActiveDriverCount()));
       setSafeTextContent("impactPoints10", "0");
-      setSafeTextContent("impactMarkers",  String(getVisiblePositionsCount()));
+      setSafeTextContent("impactMarkers",  String(positions.size));
       setSafeTextContent("rideCountTxt",   String(rideCount));
       pulse("impactActive");
       // Erst nach 3 Min. wieder pollen (DB-Zeitfenster abgelaufen)
       setTimeout(() => {
         manualEndedAt = 0;
         manualEndedDriverKey = null;
-        if (driverKey) {
-          recentlyEnded.delete(driverKey);
-          endedDrivers.delete(driverKey);
-          endedDriverAt.delete(driverKey);
-        }
+        if (driverKey) recentlyEnded.delete(driverKey);
         scheduleImpactPoll();
       }, 3 * 60_000);
     }
@@ -2416,8 +2307,8 @@
     async function fetchLatest(cutoffOverride) {
       const seq = ++latestFetchSeq;
       const now = Date.now();
-      // Fetch-Cutoff am Ride-Fenster ausrichten, Marker-Frische wird danach separat geprüft
-      const fallbackIso = new Date(now - RIDE_FRESH_MS).toISOString();
+      // Bug 3: immer STALE_MS als Fetch-Cutoff – activeOnlyMode filtert client-seitig via activeRides
+      const fallbackIso = new Date(now - STALE_MS).toISOString();
       const cutoffIso = normalizeCutoff(cutoffOverride, fallbackIso);
 
       if (currentFilterKey) {
@@ -2428,66 +2319,46 @@
           .gte("updated_at", cutoffIso).limit(1);
         if (seq !== latestFetchSeq) return;
         if (error) { logError("ERR_FETCH_LATEST_FOLLOW_V", error.message); showHint("Fehler beim Laden."); return; }
-        logMapPath("fetchLatest:rows(filter)", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
         const row = data?.[0] ?? null;
-        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
+        if (!row) { showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         if (endedDrivers.has(driverKey)) {
-          const endedAt = endedDriverAt.get(driverKey) || 0;
-          if (ts <= endedAt + 20_000) {
-            logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt, guardMs: 20000 });
-            positions.clear();
-            refreshDriversSource();
-            return;
-          }
-          recentlyEnded.delete(driverKey);
-          endedDrivers.delete(driverKey);
-          endedDriverAt.delete(driverKey);
+          positions.clear();
+          refreshDriversSource();
+          return;
         }
+        const t = Date.parse(row.updated_at);
+        const ts = Number.isFinite(t) ? t : Date.now();
         const lat = Number(row.lat), lng = Number(row.lng);
-        if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
-        const nowMs = Date.now();
-        const ageMs = nowMs - ts;
-        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); return; }
+        if (!isValidLatLng(lat, lng)) return;
+        if (Date.now() - ts > STALE_MS) return;
         positions.clear();
         positions.set(driverKey, { rawId, lng, lat, ts });
-        logMapPath("fetchLatest:set(filter)", { driverKey, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
         map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
         setLast(new Date()); refreshDriversSource();
         return;
       }
 
+      const bb = getBoundsBBoxPadded();
+      if (!bb) return;
       const { data, error } = await sb.from("v_live_positions_latest")
         .select("driver_id,lat,lng,updated_at").gte("updated_at", cutoffIso)
+        .gte("lat", bb.south).lte("lat", bb.north).gte("lng", bb.west).lte("lng", bb.east)
         .limit(BBOX_LIMIT_LATEST);
       if (seq !== latestFetchSeq) return;
       if (error) { logError("ERR_FETCH_LATEST_BBOX_V", error.message); showHint("Fehler beim Laden."); return; }
-      logMapPath("fetchLatest:rows", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
       positions.clear();
       for (const row of data || []) {
         const rawId = (row?.driver_id ?? "").toString();
-        const key = normId(rawId);
-        if (!key) { logMapPath("fetchLatest:skip", { reason: "empty-normalized-driverKey", rawId }); continue; }
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        if (endedDrivers.has(key)) {
-          const endedAt = endedDriverAt.get(key) || 0;
-          if (ts <= endedAt + 20_000) {
-            logMapPath("fetchLatest:skip", { reason: "ended-driver", driverKey: key, ts, endedAt, guardMs: 20000 });
-            continue;
-          }
-          recentlyEnded.delete(key);
-          endedDrivers.delete(key);
-          endedDriverAt.delete(key);
-        }
+        const key = normId(rawId); if (!key) continue;
+        if (endedDrivers.has(key)) continue;
+        const t = Date.parse(row.updated_at);
+        const ts = Number.isFinite(t) ? t : Date.now();
         const lat = Number(row.lat), lng = Number(row.lng);
-        if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip", { reason: "invalid-lat-lng", driverKey: key, lat, lng }); continue; }
-        const nowMs = Date.now();
-        const ageMs = nowMs - ts;
-        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip", { reason: "stale-position", driverKey: key, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); continue; }
+        if (!isValidLatLng(lat, lng)) continue;
+        if (Date.now() - ts > STALE_MS) continue;
         positions.set(key, { rawId: row.driver_id, lng, lat, ts });
-        logMapPath("fetchLatest:set", { driverKey: key, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
       }
       setLast(new Date()); refreshDriversSource();
     }
@@ -2548,7 +2419,7 @@
         while (arr.length && arr[0].ts < minTs) arr.shift();
         if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
         const last = arr[arr.length - 1];
-        if (!last || (now - last.ts > RIDE_FRESH_MS) || arr.length < 2) routePoints.delete(driverKey);
+        if (!last || (now - last.ts > STALE_MS) || arr.length < 2) routePoints.delete(driverKey);
       }
       refreshRoutesSource();
     }
@@ -2568,10 +2439,11 @@
         if (error) { logError("ERR_FETCH_POS_RETRY", error.message); continue; }
         const row = data?.[0];
         if (!row) { logDebug("fetchPositionWithRetry: kein Eintrag (Versuch", i + 1, "):", driverKey); continue; }
+        const t = Date.parse(row.updated_at);
+        const ts = Number.isFinite(t) ? t : Date.now();
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) return;
-        const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-        if (Date.now() - ts > RIDE_FRESH_MS) return; // Position zu alt
+        if (Date.now() - ts > STALE_MS) return; // Position zu alt
         const rawId = (row.driver_id ?? "").toString();
         positions.set(driverKey, { rawId, lng, lat, ts });
         logDebug("fetchPositionWithRetry: Position gesetzt (Versuch", i + 1, "):", driverKey);
@@ -2587,9 +2459,9 @@
       // Kein BBox-Filter: Fahrer-Position kann außerhalb der sichtbaren Karte liegen
       // während die Route durch den sichtbaren Bereich führt → würde Route verschwinden lassen
       // Rides sind durch LIMIT 200 begrenzt, BBox daher nicht nötig
-      let query = sb.from("v_aktive_fahrten").select(
-        "ride_id,driver_id,fahrer_name,fahrer_bewertung,fahrer_lat,fahrer_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte"
-      );
+      // Nur Rides mit frischer Position laden (STALE_MS-Filter gegen Altzustände)
+      const staleIso = new Date(Date.now() - STALE_MS).toISOString();
+      let query = sb.from("v_aktive_fahrten").select("*").gte("updated_at", staleIso);
 
       const { data, error } = await query.limit(200);
       if (seq !== ridesFetchSeq) return;
@@ -2610,7 +2482,6 @@
         if (recentlyEnded.has(driverKey) || endedDrivers.has(driverKey)) {
           recentlyEnded.delete(driverKey);
           endedDrivers.delete(driverKey);
-          endedDriverAt.delete(driverKey);
           reactivatedDrivers.add(driverKey); // Position fehlt → fetchLatest nötig
         }
         if (positions.size > 0 && !positions.has(driverKey)) continue;
@@ -2622,9 +2493,7 @@
       }
       renderModeUI(); // Lock-Zustand aktualisieren
 
-      // Fahrer die nicht mehr in aktiven Rides sind:
-      // Ride-/Routenpfad leeren, Marker-Positionen aber NICHT löschen.
-      // Marker sollen ausschließlich dem Live-Positionspfad folgen.
+      // Fahrer die nicht mehr in aktiven Rides sind → Marker sofort entfernen
       const nowDriverKeys = new Set(
         [...activeRides.values()].map(r => normId(r.driver_id))
       );
@@ -2632,6 +2501,7 @@
       for (const driverKey of prevDriverKeys) {
         if (!nowDriverKeys.has(driverKey)) {
           endedDrivers.add(driverKey);
+          positions.delete(driverKey);
           routePoints.delete(driverKey);
           markerChanged = true;
         }
@@ -2639,27 +2509,26 @@
 
       for (const [rideId, ride] of [...activeRides.entries()]) {
         const driverKey = normId(ride.driver_id);
-        if (!driverKey || !hasRidePositionWithinStaleWindow(driverKey)) {
+        if (!driverKey || !hasFreshDriverPosition(driverKey)) {
           activeRides.delete(rideId);
         }
       }
 
-      // Fix B: Ohne aktive Fahrt keine Ride-Route mehr zeigen,
-      // aber Marker nicht aus dem Ride-Pfad löschen.
+      // Fix B: Reload-Bug – Positionen ohne aktive Fahrt bereinigen
+      // Schonfenster 10s: frisch gestartete Fahrten erscheinen kurz vor v_aktive_fahrten-JOIN
       const now = Date.now();
       for (const [key, pos] of positions.entries()) {
         if (nowDriverKeys.has(key)) continue;
         if (recentlyEnded.has(key)) continue; // manuell gesperrt → bereits behandelt
         const posAge = now - (pos.ts ?? 0);
-        if (posAge < 10_000) continue; // Schonfenster: frische Position nicht sofort anfassen
-        if (routePoints.has(key)) {
-          endedDrivers.add(key);
-          routePoints.delete(key);
-          markerChanged = true;
-        }
+        if (posAge < 10_000) continue; // Schonfenster: frische Position nicht sofort löschen
+        endedDrivers.add(key);
+        positions.delete(key);
+        routePoints.delete(key);
+        markerChanged = true;
       }
 
-      if (markerChanged) { refreshRoutesSource(); }
+      if (markerChanged) { refreshDriversSource(); refreshRoutesSource(); }
 
       refreshRidesSource();
     }
@@ -2803,23 +2672,19 @@
       if (!map || !row?.driver_id) return;
       const rawId = (row.driver_id ?? "").toString();
       const driverKey = normId(rawId); if (!driverKey) return;
+      if (endedDrivers.has(driverKey)) return;
+      const t = Date.parse(row.updated_at);
+      const ts = Number.isFinite(t) ? t : Date.now();
       const lat = Number(row.lat), lng = Number(row.lng);
       if (!isValidLatLng(lat, lng)) return;
-      const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
-      if (Date.now() - ts > RIDE_FRESH_MS) return;
-
-      if (endedDrivers.has(driverKey)) {
-        const endedAt = endedDriverAt.get(driverKey) || 0;
-        if (ts <= endedAt + 20_000) return; // altes/spätes Restsignal nach manuellem Ende ignorieren
-        recentlyEnded.delete(driverKey);
-        endedDrivers.delete(driverKey);
-        endedDriverAt.delete(driverKey);
-      }
+      if (Date.now() - ts > STALE_MS) return;
 
       if (currentFilterKey) {
         if (driverKey !== currentFilterKey) return;
         positions.set(driverKey, { rawId, lng, lat, ts });
       } else {
+        const bb = getBoundsBBoxPadded();
+        if (bb && !isInBbox(bb, lng, lat)) return;
         positions.set(driverKey, { rawId, lng, lat, ts });
       }
 
@@ -2845,7 +2710,7 @@
 
       // 1. Stale Fahrer-Positionen entfernen
       for (const [key, p] of positions.entries()) {
-        if (now - (p?.ts || 0) > RIDE_FRESH_MS) {
+        if (now - (p?.ts || 0) > STALE_MS) {
           positions.delete(key);
           routePoints.delete(key);
           driversChanged = true;
@@ -2856,7 +2721,7 @@
       // (Fahrt in DB noch aktiv, aber Fahrer sendet kein GPS mehr)
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
-        if (!driverKey || !hasRidePositionWithinStaleWindow(driverKey)) {
+        if (!driverKey || !hasFreshDriverPosition(driverKey)) {
           activeRides.delete(rideId);
           ridesChanged = true;
         }
