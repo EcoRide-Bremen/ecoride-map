@@ -2613,7 +2613,6 @@
           endedDriverAt.delete(driverKey);
           reactivatedDrivers.add(driverKey); // Position fehlt → fetchLatest nötig
         }
-        if (positions.size > 0 && !positions.has(driverKey)) continue;
         activeRides.set(row.ride_id, row);
       }
       // Reaktivierte Fahrer: positions ist leer → Retry per driver_id bis Marker erscheint
@@ -2658,7 +2657,34 @@
         markerChanged = true;
       }
 
-      if (markerChanged) { refreshRoutesSource(); }
+      // Zusatzschutz: wenn eine aktive Fahrt endet, darf kein alter Marker über einen
+      // zweiten Renderpfad wieder sichtbar bleiben. Deshalb alle aktiven DriverKeys,
+      // die nicht mehr in activeRides enthalten sind, konsequent aus der Driver-Source drücken.
+      if (positions.size === 0 && nowDriverKeys.size === 0 && map?.getSource?.(DRIVERS_SOURCE)) {
+        logMapPath("fetchActiveRides:force-empty-driver-source", {
+          positionsSize: positions.size,
+          activeRidesSize: activeRides.size,
+          sourceFeatureCountBefore: getDriverSourceFeatureCount()
+        });
+        map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
+        hideAllDriverLayersImmediately();
+        markerChanged = true;
+      }
+
+      if (markerChanged) {
+        logMapPath("fetchActiveRides:driver-render-refresh", {
+          positionsSize: positions.size,
+          activeRidesSize: activeRides.size,
+          sourceFeatureCountBefore: getDriverSourceFeatureCount()
+        });
+        refreshDriversSource();
+        refreshRoutesSource();
+        logMapPath("fetchActiveRides:driver-render-refresh:done", {
+          positionsSize: positions.size,
+          activeRidesSize: activeRides.size,
+          sourceFeatureCountAfter: getDriverSourceFeatureCount()
+        });
+      }
 
       refreshRidesSource();
     }
