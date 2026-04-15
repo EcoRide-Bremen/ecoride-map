@@ -2887,9 +2887,11 @@
     }
 
     const pulseTimer = setInterval(() => {
-      if (!mapReady || mapHidden) return;
+      if (!mapReady || mapHidden || !map) return;
       const hasLiveDriver = [...positions.keys()].some((driverKey) => getDriverRouteState(driverKey) === "active");
-      if (hasLiveDriver) refreshDriversSource();
+      if (!hasLiveDriver) return;
+      refreshDriversSource();
+      map.triggerRepaint?.();
     }, 180);
 
     // ─────────────────────────────────────────────────
@@ -3030,6 +3032,7 @@
     // ─────────────────────────────────────────────────
     function cleanup() {
       try { clearInterval(pruneTimer); }    catch (_) {}
+      try { clearInterval(pulseTimer); }    catch (_) {}
       try { clearImpactTimer(); }           catch (_) {}
       try { stopRealtimeWatchdog(); }       catch (_) {}
       try { if (map && onMoveEnd) map.off("moveend", onMoveEnd); } catch (_) {}
