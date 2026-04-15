@@ -1862,6 +1862,8 @@
       if (!map) return;
       if (map.getLayer(LAYER_POINTS_SELECTED)) map.removeLayer(LAYER_POINTS_SELECTED);
       if (map.getLayer(LAYER_POINTS)) map.removeLayer(LAYER_POINTS);
+      if (map.getLayer(`${LAYER_POINTS}-ring`)) map.removeLayer(`${LAYER_POINTS}-ring`);
+      if (map.getLayer(`${LAYER_POINTS}-pulse`)) map.removeLayer(`${LAYER_POINTS}-pulse`);
       if (map.getLayer(LAYER_CLUSTER_COUNT)) map.removeLayer(LAYER_CLUSTER_COUNT);
       if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.removeLayer(LAYER_CLUSTER_CIRCLE);
       if (map.getSource(DRIVERS_SOURCE)) map.removeSource(DRIVERS_SOURCE);
@@ -1875,9 +1877,10 @@
       });
       map.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-color":"#334155","circle-radius":["step",["get","point_count"],18,10,22,25,28],"circle-opacity":0.9}});
       map.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-size":12},paint:{"text-color":"#fff"}});
-      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",7,["*",["get","pulseScale"],8]],"circle-color":"rgba(34,197,94,0.22)","circle-stroke-width":0,"circle-opacity":["get","pulseOpacity"]}});
-      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","#22c55e"],"circle-stroke-color":"#0b0f14","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.98]}});
-      map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":10,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","#B7D532"],"circle-stroke-color":"#fff","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.75,0.98]}});
+      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",11,["*",["get","pulseScale"],10]],"circle-color":"rgba(34,197,94,0.18)","circle-stroke-width":0,"circle-opacity":["get","pulseOpacity"]}});
+      map.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0.96]}});
+      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","#22c55e"],"circle-stroke-color":"rgba(11,15,20,0.18)","circle-stroke-width":1,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.98]}});
+      map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":"#60a5fa","circle-stroke-width":3,"circle-opacity":0.92}});
     }
     function refreshDriversSource() {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
@@ -2442,7 +2445,7 @@
         if (error) { logError("ERR_FETCH_LATEST_FOLLOW_V", error.message); showHint("Fehler beim Laden."); return; }
         logMapPath("fetchLatest:rows(filter)", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
         const row = data?.[0] ?? null;
-        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); refreshRidesSource(); return; }
+        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein frisches Signal für diesen Fahrer."); refreshDriversSource(); refreshRidesSource(); return; }
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
@@ -2451,7 +2454,7 @@
           const endedAt = endedDriverAt.get(driverKey) || 0;
           if (ts <= endedAt + 20_000) {
             logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt, guardMs: 20000 });
-            positions.clear();
+            positions.delete(driverKey);
             refreshDriversSource();
             refreshRidesSource();
             return;
@@ -2464,8 +2467,8 @@
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
-        positions.clear();
         if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); refreshDriversSource(); refreshRidesSource(); return; }
+        positions.clear();
         positions.set(driverKey, { rawId, lng, lat, ts });
         logMapPath("fetchLatest:set(filter)", { driverKey, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
         map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
@@ -2479,7 +2482,7 @@
       if (seq !== latestFetchSeq) return;
       if (error) { logError("ERR_FETCH_LATEST_BBOX_V", error.message); showHint("Fehler beim Laden."); return; }
       logMapPath("fetchLatest:rows", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
-      positions.clear();
+      const nextPositions = new Map();
       for (const row of data || []) {
         const rawId = (row?.driver_id ?? "").toString();
         const key = normId(rawId);
@@ -2501,9 +2504,17 @@
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
         if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip", { reason: "stale-position", driverKey: key, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); continue; }
-        positions.set(key, { rawId: row.driver_id, lng, lat, ts });
-        logMapPath("fetchLatest:set", { driverKey: key, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
+        nextPositions.set(key, { rawId: row.driver_id, lng, lat, ts });
+        logMapPath("fetchLatest:set", { driverKey: key, rawId, lat, lng, updated_at: row.updated_at, positionsSize: nextPositions.size, ageMs });
       }
+      for (const [key, pos] of positions.entries()) {
+        if (nextPositions.has(key)) continue;
+        if ([...activeRides.values()].some((ride) => normId(ride.driver_id) === key)) {
+          nextPositions.set(key, pos);
+        }
+      }
+      positions.clear();
+      for (const [key, pos] of nextPositions.entries()) positions.set(key, pos);
       setLast(new Date()); refreshDriversSource(); refreshRidesSource();
     }
 
@@ -2891,10 +2902,10 @@
       // Nur echte Altlasten aus positions entfernen.
       // Active rides bleiben sichtbar, solange die Fahrt aktiv ist.
       for (const [key, p] of positions.entries()) {
-        if (now - (p?.ts || 0) > RIDE_FRESH_MS) {
-          positions.delete(key);
-          driversChanged = true;
-        }
+        if (now - (p?.ts || 0) <= RIDE_FRESH_MS) continue;
+        if (activeRides.size > 0 && [...activeRides.values()].some((ride) => normId(ride.driver_id) === key)) continue;
+        positions.delete(key);
+        driversChanged = true;
       }
 
       if (driversChanged) { refreshDriversSource(); refreshRoutesSource(); refreshRidesSource(); }
@@ -3079,9 +3090,10 @@
         m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
         m.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-radius":["step",["get","point_count"],16,25,20,50,26,100,32],"circle-color":"rgba(199,223,58,0.70)","circle-stroke-width":1,"circle-stroke-color":"rgba(17,24,37,0.35)"}});
         m.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":["DIN Offc Pro Medium","Arial Unicode MS Bold"],"text-size":12},paint:{"text-color":"#0b0f14"}});
-        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",7,["*",["get","pulseScale"],8]],"circle-color":"rgba(34,197,94,0.22)","circle-stroke-width":0,"circle-opacity":["get","pulseOpacity"]}});
-        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":2,"circle-stroke-color":"rgba(199,223,58,0.35)"}});
-        m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":9,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","rgba(199,223,58,0.98)"],"circle-stroke-width":3,"circle-stroke-color":"rgba(255,255,255,0.35)","circle-opacity":["case",["==",["get","stale"],1],0.75,1]}});
+        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",11,["*",["get","pulseScale"],10]],"circle-color":"rgba(34,197,94,0.18)","circle-stroke-width":0,"circle-opacity":["get","pulseOpacity"]}});
+        m.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0.96]}});
+        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":1,"circle-stroke-color":"rgba(11,15,20,0.18)"}});
+        m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-width":3,"circle-stroke-color":"#60a5fa","circle-opacity":0.92}});
         m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
         m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;const rawId=f.properties?.rawId??"";const df=document.getElementById("driverFilter");if(df)df.value=rawId;currentFilter=String(rawId).trim();currentFilterKey=normId(currentFilter);updateSelectedLayerFilter();m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
         m.on("mouseenter",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="pointer";});
