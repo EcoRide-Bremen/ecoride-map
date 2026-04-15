@@ -1877,7 +1877,7 @@
       });
       map.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-color":"#334155","circle-radius":["step",["get","point_count"],18,10,22,25,28],"circle-opacity":0.9}});
       map.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-size":12},paint:{"text-color":"#fff"}});
-      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",9,["*",["get","pulseScale"],3]],"circle-color":"rgba(34,197,94,0.08)","circle-stroke-color":"rgba(34,197,94,0.72)","circle-stroke-width":["+",1.2,["*",["-",1,["get","pulseScale"]],0.8]],"circle-opacity":["get","pulseOpacity"]}});
+      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":9,"circle-color":"rgba(34,197,94,0)","circle-stroke-color":"rgba(34,197,94,0.78)","circle-stroke-width":1.8,"circle-opacity":0.95}});
       map.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0.96]}});
       map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","#22c55e"],"circle-stroke-color":"rgba(11,15,20,0.18)","circle-stroke-width":1,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.98]}});
       map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":"#60a5fa","circle-stroke-width":3,"circle-opacity":0.92}});
@@ -1912,13 +1912,10 @@
         if (state === "hidden") continue;
         const ageMs = (now - (p.ts || now));
         const stale = state === "stale";
-        const pulsePhase = ((Date.now() % 1200) / 1200);
-        const pulseScale = stale ? 0 : pulsePhase;
-        const pulseOpacity = stale ? 0 : (0.16 + (0.16 * (1 - pulsePhase)));
         logMapPath("refreshDriversSource:keep", { driverKey, rawId: p.rawId, lat: p.lat, lng: p.lng, ts: p.ts, ageMs, stale, state });
         feats.push({
           type: "Feature",
-          properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0, isLive: stale ? 0 : 1, pulseScale, pulseOpacity },
+          properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0, isLive: stale ? 0 : 1 },
           geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
@@ -2886,12 +2883,6 @@
       if (shouldPollImpact() && sinceOk > 3000) fetchImpactOnce().catch(() => {});
     }
 
-    const pulseTimer = setInterval(() => {
-      if (!mapReady || mapHidden) return;
-      const hasLiveDriver = [...positions.keys()].some((driverKey) => getDriverRouteState(driverKey) === "active");
-      if (hasLiveDriver) refreshDriversSource();
-    }, 180);
-
     // ─────────────────────────────────────────────────
     // PRUNE STALE POSITIONS
     // ─────────────────────────────────────────────────
@@ -3090,7 +3081,7 @@
         m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
         m.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-radius":["step",["get","point_count"],16,25,20,50,26,100,32],"circle-color":"rgba(199,223,58,0.70)","circle-stroke-width":1,"circle-stroke-color":"rgba(17,24,37,0.35)"}});
         m.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":["DIN Offc Pro Medium","Arial Unicode MS Bold"],"text-size":12},paint:{"text-color":"#0b0f14"}});
-        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",9,["*",["get","pulseScale"],3]],"circle-color":"rgba(34,197,94,0.08)","circle-stroke-color":"rgba(34,197,94,0.72)","circle-stroke-width":["+",1.2,["*",["-",1,["get","pulseScale"]],0.8]],"circle-opacity":["get","pulseOpacity"]}});
+        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":9,"circle-color":"rgba(34,197,94,0)","circle-stroke-color":"rgba(34,197,94,0.78)","circle-stroke-width":1.8,"circle-opacity":0.95}});
         m.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0.96]}});
         m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":1,"circle-stroke-color":"rgba(11,15,20,0.18)"}});
         m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-width":3,"circle-stroke-color":"#60a5fa","circle-opacity":0.92}});
