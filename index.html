@@ -946,21 +946,27 @@
     const positions   = new Map();
     const routePoints = new Map();
     const activeRides = new Map(); // NEU: rideId → v_aktive_fahrten row
+    const driverSignalTs = new Map(); // driverKey -> letzter bekannter GPS-Zeitstempel
     const endedDrivers = new Set(); // Fahrer mit bewusst beendeter Fahrt -> Marker sofort sperren
     const recentlyEnded = new Set(); // Fahrer im 3-Min-Sperr-Fenster nach manuellem Ende
     const endedDriverAt = new Map(); // driverKey -> Zeitstempel des manuellen Endes
 
+    function rememberDriverSignal(driverKey, ts) {
+      if (!driverKey || !Number.isFinite(ts)) return;
+      const prev = driverSignalTs.get(driverKey) || 0;
+      if (ts > prev) driverSignalTs.set(driverKey, ts);
+    }
+
     function getDriverRouteState(driverKey) {
-      const pos = positions.get(driverKey);
-      if (!pos?.ts) return "hidden";
-      const ageMs = Date.now() - pos.ts;
+      const ts = driverSignalTs.get(driverKey) || positions.get(driverKey)?.ts || null;
+      if (!ts) return "hidden";
+      const ageMs = Date.now() - ts;
       if (ageMs <= MARKER_FRESH_MS) return "active";
-      if (ageMs <= RIDE_FRESH_MS) return "stale";
-      return "hidden";
+      return "stale";
     }
 
     function hasVisibleMarkerPosition(driverKey) {
-      return getDriverRouteState(driverKey) === "active";
+      return getDriverRouteState(driverKey) !== "hidden";
     }
 
     function hasRidePositionWithinStaleWindow(driverKey) {
@@ -970,7 +976,7 @@
     function getVisibleActiveRides() {
       return [...activeRides.entries()].filter(([, ride]) => {
         const driverKey = normId(ride.driver_id);
-        return !!driverKey && getDriverRouteState(driverKey) === "active";
+        return !!driverKey && getDriverRouteState(driverKey) !== "hidden";
       });
     }
 
@@ -1869,8 +1875,9 @@
       });
       map.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-color":"#334155","circle-radius":["step",["get","point_count"],18,10,22,25,28],"circle-opacity":0.9}});
       map.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-size":12},paint:{"text-color":"#fff"}});
-      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"#94a3b8","#22c55e"],"circle-stroke-color":"#0b0f14","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.55,0.95]}});
-      map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":10,"circle-color":"#B7D532","circle-stroke-color":"#fff","circle-stroke-width":2,"circle-opacity":0.98}});
+      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",7,["*",["get","pulseScale"],8]],"circle-color":"rgba(34,197,94,0.22)","circle-stroke-width":0,"circle-opacity":["get","pulseOpacity"]}});
+      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","#22c55e"],"circle-stroke-color":"#0b0f14","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.98]}});
+      map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":10,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","#B7D532"],"circle-stroke-color":"#fff","circle-stroke-width":2,"circle-opacity":["case",["==",["get","stale"],1],0.75,0.98]}});
     }
     function refreshDriversSource() {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
@@ -1898,12 +1905,17 @@
             continue;
           }
         }
+        const state = getDriverRouteState(driverKey);
+        if (state === "hidden") continue;
         const ageMs = (now - (p.ts || now));
-        const stale = ageMs > MARKER_FRESH_MS;
-        logMapPath("refreshDriversSource:keep", { driverKey, rawId: p.rawId, lat: p.lat, lng: p.lng, ts: p.ts, ageMs, stale });
+        const stale = state === "stale";
+        const pulsePhase = ((Date.now() % 1000) / 1000);
+        const pulseScale = stale ? 0 : pulsePhase;
+        const pulseOpacity = stale ? 0 : Math.max(0, 0.24 * (1 - pulsePhase));
+        logMapPath("refreshDriversSource:keep", { driverKey, rawId: p.rawId, lat: p.lat, lng: p.lng, ts: p.ts, ageMs, stale, state });
         feats.push({
           type: "Feature",
-          properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0 },
+          properties: { driverKey, rawId: p.rawId, ts: p.ts, stale: stale ? 1 : 0, isLive: stale ? 0 : 1, pulseScale, pulseOpacity },
           geometry: { type: "Point", coordinates: [p.lng, p.lat] }
         });
       }
@@ -1951,7 +1963,7 @@
 
       for (const { rideId, ride, routeState } of canonicalRideByDriver.values()) {
         const zLat = Number(ride.ziel_lat), zLng = Number(ride.ziel_lng);
-        if (routeState === "active" && !isValidLatLng(zLat, zLng)) continue;
+        if (!isValidLatLng(zLat, zLng)) continue;
 
         const props = {
           rideId,
@@ -1966,10 +1978,10 @@
         };
 
         // ── Ziel-Punkt (orange) ──
-        if (routeState === "active") {
+        if (routeState !== "hidden") {
           destFeatures.push({
             type: "Feature",
-            properties: props,
+            properties: { ...props, stale: routeState === "stale" ? 1 : 0 },
             geometry: { type: "Point", coordinates: [zLng, zLat] }
           });
         }
@@ -2002,7 +2014,7 @@
               driverId: ride.driver_id || "",
               route_state: routeState,
               stale: routeState === "stale" ? 1 : 0,
-              color: routeState === "active" ? "#B7D532" : "rgba(148,163,184,0.55)"
+              color: routeState === "active" ? "#B7D532" : "#6B7A8F"
             },
             geometry: { type: "LineString", coordinates: coords }
           });
@@ -2430,16 +2442,18 @@
         if (error) { logError("ERR_FETCH_LATEST_FOLLOW_V", error.message); showHint("Fehler beim Laden."); return; }
         logMapPath("fetchLatest:rows(filter)", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
         const row = data?.[0] ?? null;
-        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); return; }
+        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein Signal für diesen Fahrer."); positions.clear(); refreshDriversSource(); refreshRidesSource(); return; }
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        rememberDriverSignal(driverKey, ts);
         if (endedDrivers.has(driverKey)) {
           const endedAt = endedDriverAt.get(driverKey) || 0;
           if (ts <= endedAt + 20_000) {
             logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt, guardMs: 20000 });
             positions.clear();
             refreshDriversSource();
+            refreshRidesSource();
             return;
           }
           recentlyEnded.delete(driverKey);
@@ -2450,12 +2464,12 @@
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
-        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); return; }
         positions.clear();
+        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); refreshDriversSource(); refreshRidesSource(); return; }
         positions.set(driverKey, { rawId, lng, lat, ts });
         logMapPath("fetchLatest:set(filter)", { driverKey, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
         map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
-        setLast(new Date()); refreshDriversSource();
+        setLast(new Date()); refreshDriversSource(); refreshRidesSource();
         return;
       }
 
@@ -2471,6 +2485,7 @@
         const key = normId(rawId);
         if (!key) { logMapPath("fetchLatest:skip", { reason: "empty-normalized-driverKey", rawId }); continue; }
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        rememberDriverSignal(key, ts);
         if (endedDrivers.has(key)) {
           const endedAt = endedDriverAt.get(key) || 0;
           if (ts <= endedAt + 20_000) {
@@ -2489,7 +2504,7 @@
         positions.set(key, { rawId: row.driver_id, lng, lat, ts });
         logMapPath("fetchLatest:set", { driverKey: key, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
       }
-      setLast(new Date()); refreshDriversSource();
+      setLast(new Date()); refreshDriversSource(); refreshRidesSource();
     }
 
     // ─────────────────────────────────────────────────
@@ -2516,6 +2531,7 @@
           if (!isValidLatLng(lat, lng)) continue;
           const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
           if (!ts) continue;
+          rememberDriverSignal(key, ts);
           arr.push({ lng, lat, ts });
         }
         const minTs = now - ROUTE_MS;
@@ -2540,6 +2556,7 @@
         if (!isValidLatLng(lat, lng)) continue;
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : null;
         if (!ts) continue;
+        rememberDriverSignal(driverKey, ts);
         const arr = routePoints.get(driverKey) ?? [];
         arr.push({ lng, lat, ts }); routePoints.set(driverKey, arr);
       }
@@ -2571,6 +2588,7 @@
         const lat = Number(row.lat), lng = Number(row.lng);
         if (!isValidLatLng(lat, lng)) return;
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        rememberDriverSignal(driverKey, ts);
         if (Date.now() - ts > RIDE_FRESH_MS) return; // Position zu alt
         const rawId = (row.driver_id ?? "").toString();
         positions.set(driverKey, { rawId, lng, lat, ts });
@@ -2633,14 +2651,8 @@
           endedDrivers.add(driverKey);
           positions.delete(driverKey);
           routePoints.delete(driverKey);
+          driverSignalTs.delete(driverKey);
           markerChanged = true;
-        }
-      }
-
-      for (const [rideId, ride] of [...activeRides.entries()]) {
-        const driverKey = normId(ride.driver_id);
-        if (!driverKey || !hasRidePositionWithinStaleWindow(driverKey)) {
-          activeRides.delete(rideId);
         }
       }
 
@@ -2706,6 +2718,7 @@
             if (key) {
               positions.delete(key);
               routePoints.delete(key);
+              driverSignalTs.delete(key);
               // Auch zugehörige Rides sofort entfernen → Zielpunkt + Route weg
               for (const [rideId, ride] of activeRides.entries()) {
                 if (normId(ride.driver_id) === key) activeRides.delete(rideId);
@@ -2763,6 +2776,7 @@
               endedDrivers.add(driverKey);
               positions.delete(driverKey);
               routePoints.delete(driverKey);
+              driverSignalTs.delete(driverKey);
             }
             refreshRidesSource();
             refreshDriversSource();
@@ -2831,6 +2845,7 @@
       const lat = Number(row.lat), lng = Number(row.lng);
       if (!isValidLatLng(lat, lng)) return;
       const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+      rememberDriverSignal(driverKey, ts);
       if (Date.now() - ts > RIDE_FRESH_MS) return;
 
       if (endedDrivers.has(driverKey)) {
@@ -2860,35 +2875,29 @@
       if (shouldPollImpact() && sinceOk > 3000) fetchImpactOnce().catch(() => {});
     }
 
+    const pulseTimer = setInterval(() => {
+      if (!mapReady || mapHidden) return;
+      const hasLiveDriver = [...positions.keys()].some((driverKey) => getDriverRouteState(driverKey) === "active");
+      if (hasLiveDriver) refreshDriversSource();
+    }, 180);
+
     // ─────────────────────────────────────────────────
-    // PRUNE STALE POSITIONS + ORPHANED RIDES
+    // PRUNE STALE POSITIONS
     // ─────────────────────────────────────────────────
     const pruneTimer = setInterval(() => {
       const now = Date.now();
       let driversChanged = false;
-      let ridesChanged   = false;
 
-      // 1. Stale Fahrer-Positionen entfernen
+      // Nur echte Altlasten aus positions entfernen.
+      // Active rides bleiben sichtbar, solange die Fahrt aktiv ist.
       for (const [key, p] of positions.entries()) {
         if (now - (p?.ts || 0) > RIDE_FRESH_MS) {
           positions.delete(key);
-          routePoints.delete(key);
           driversChanged = true;
         }
       }
 
-      // 2. Rides ohne frische Fahrer-Position ausblenden
-      // (Fahrt in DB noch aktiv, aber Fahrer sendet kein GPS mehr)
-      for (const [rideId, ride] of activeRides.entries()) {
-        const driverKey = normId(ride.driver_id);
-        if (!driverKey || !hasRidePositionWithinStaleWindow(driverKey)) {
-          activeRides.delete(rideId);
-          ridesChanged = true;
-        }
-      }
-
-      if (driversChanged) { refreshDriversSource(); refreshRoutesSource(); }
-      if (ridesChanged)   { refreshRidesSource(); }
+      if (driversChanged) { refreshDriversSource(); refreshRoutesSource(); refreshRidesSource(); }
     }, PRUNE_EVERY_MS);
 
     // ─────────────────────────────────────────────────
@@ -3070,8 +3079,9 @@
         m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
         m.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-radius":["step",["get","point_count"],16,25,20,50,26,100,32],"circle-color":"rgba(199,223,58,0.70)","circle-stroke-width":1,"circle-stroke-color":"rgba(17,24,37,0.35)"}});
         m.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":["DIN Offc Pro Medium","Arial Unicode MS Bold"],"text-size":12},paint:{"text-color":"#0b0f14"}});
-        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(199,223,58,0.35)","rgba(199,223,58,0.92)"],"circle-opacity":["case",["==",["get","stale"],1],0.65,1],"circle-stroke-width":2,"circle-stroke-color":"rgba(199,223,58,0.35)"}});
-        m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":9,"circle-color":["case",["==",["get","stale"],1],"rgba(199,223,58,0.75)","rgba(199,223,58,0.98)"],"circle-stroke-width":3,"circle-stroke-color":"rgba(255,255,255,0.35)"}});
+        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",7,["*",["get","pulseScale"],8]],"circle-color":"rgba(34,197,94,0.22)","circle-stroke-width":0,"circle-opacity":["get","pulseOpacity"]}});
+        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":7,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":2,"circle-stroke-color":"rgba(199,223,58,0.35)"}});
+        m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":9,"circle-color":["case",["==",["get","stale"],1],"rgba(107,122,143,0.95)","rgba(199,223,58,0.98)"],"circle-stroke-width":3,"circle-stroke-color":"rgba(255,255,255,0.35)","circle-opacity":["case",["==",["get","stale"],1],0.75,1]}});
         m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
         m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;const rawId=f.properties?.rawId??"";const df=document.getElementById("driverFilter");if(df)df.value=rawId;currentFilter=String(rawId).trim();currentFilterKey=normId(currentFilter);updateSelectedLayerFilter();m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
         m.on("mouseenter",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="pointer";});
@@ -3096,13 +3106,13 @@
           source:RIDES_ROUTE_SOURCE,
           filter:["==",["get","stale"],1],
           layout:{"line-join":"round","line-cap":"round"},
-          paint:{"line-color":"rgba(148,163,184,0.55)","line-width":2.5,"line-opacity":0.42,"line-dasharray":[2,2]}
+          paint:{"line-color":"#6B7A8F","line-width":2.5,"line-opacity":0.7,"line-dasharray":[2,2]}
         });
       }
       // Ride-Ziele
       if (!m.getSource(RIDES_SOURCE)) {
         m.addSource(RIDES_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
-        m.addLayer({id:LAYER_RIDE_DEST,type:"circle",source:RIDES_SOURCE,paint:{"circle-radius":10,"circle-color":"#ff9500","circle-opacity":0.92,"circle-stroke-width":2.5,"circle-stroke-color":"rgba(255,255,255,0.80)"}});
+        m.addLayer({id:LAYER_RIDE_DEST,type:"circle",source:RIDES_SOURCE,paint:{"circle-radius":10,"circle-color":"#ff9500","circle-opacity":["case",["==",["get","stale"],1],0.65,0.92],"circle-stroke-width":2.5,"circle-stroke-color":"rgba(255,255,255,0.80)"}});
         m.on("click",LAYER_RIDE_DEST,(e)=>{e.originalEvent?.stopPropagation();const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:550});openRidePopup(f);});
         m.on("mouseenter",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="pointer";});
         m.on("mouseleave",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="";});
