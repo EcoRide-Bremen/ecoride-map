@@ -91,37 +91,7 @@
     .panel.collapsed .stat2,
     .panel.collapsed .stat3,
     .panel.collapsed .stat4,
-    .panel.collapsed .mode-switcher,
     .panel.collapsed .mode-panel { display:none !important; }
-
-    /* ── Modus-Umschalter ── */
-    .mode-switcher {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      margin: 10px 10px 0;
-    }
-    .mode-btn {
-      flex: 1;
-      height: 30px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid rgba(199,223,58,0.25);
-      background: rgba(17,24,37,0.28);
-      color: #e5e7eb;
-      transition: background .2s, color .2s;
-    }
-    .mode-btn.active {
-      background: rgba(199,223,58,0.85);
-      color: #0b0f14;
-      border-color: transparent;
-    }
-    .mode-btn:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
 
     /* ── Mode-Panels ── */
     .mode-panel { margin-top: 8px; }
@@ -713,61 +683,8 @@
   <div class="panel collapsed">
     <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
 
-    <!-- ── Modus-Umschalter ── -->
-    <div class="mode-switcher">
-      <button id="btnModeDriver"    class="mode-btn active">Fahrer</button>
-      <button id="btnModePassenger" class="mode-btn">Mitfahrer</button>
-    </div>
-
-    <!-- ── FAHRER-PANEL ── -->
-    <div class="mode-panel" id="driverPanel">
-      <div class="row">
-        <div class="input-button-group">
-          <input id="driverFilter" placeholder="Driver ID" />
-        </div>
-        <div class="button-group">
-          <button id="btnApply">Folgen</button>
-          <button id="btnAll" class="secondary">Aufheben</button>
-          <button id="btnToggleRoutes" class="secondary">Einblenden</button>
-          <button id="btnActiveOnly" class="secondary">Aktive</button>
-        </div>
-      </div>
-
-      <div class="stat">
-        <div class="left">
-          <span id="rtDot" class="dot"></span>
-          <span id="rtTxt">Realtime: AUS</span>
-        </div>
-        <div class="mid">
-          <span id="hintInline" class="hint-inline"></span>
-        </div>
-        <div class="right">
-          <span id="countTxt">Marker: 0</span>
-        </div>
-      </div>
-
-      <div class="stat2">
-        <div class="last-left">
-          <span>Letztes Update:</span>
-          <span id="syncIcon" class="sync" title="Aktualisiere…">⟳</span>
-        </div>
-        <div id="lastTxt">–</div>
-      </div>
-
-      <div class="stat3">
-        <div>Aktiv: <span id="impactActive" class="pulse">–</span></div>
-        <div>Punkte 10m: <span id="impactPoints10" class="pulse">–</span></div>
-        <div>Marker: <span id="impactMarkers" class="pulse">0</span></div>
-      </div>
-
-      <div class="stat4">
-        <div>🟠 Fahrten: <span id="rideCountTxt" class="pulse">0</span></div>
-        <div style="font-size:11px;opacity:0.55">Ziel = orangener Punkt</div>
-      </div>
-    </div><!-- /driverPanel -->
-
     <!-- ── MITFAHRER-PANEL ── -->
-    <div class="mode-panel" id="passengerPanel" style="display:none">
+    <div class="mode-panel" id="passengerPanel">
 
       <!-- Accordion Block 1: Treffpunkt – Header immer sichtbar -->
       <div class="pax-acc-block" id="paxAccBlock1">
@@ -1045,52 +962,10 @@
     let paxCooldownTimer       = null;    // Interval für Countdown-Anzeige
     const paxStartTimes        = [];      // Timestamps der Suchstarts (für Rate-Limit)
 
-    // ─────────────────────────────────────────────────
-    // MODUS-UMSCHALTER (Fahrer / Mitfahrer)
-    // ─────────────────────────────────────────────────
-    // Modus: "driver" | "passenger"
-    let appMode = localStorage.getItem("er_mode") || "driver";
-
-    function isModeLocked() {
-      // Gesperrt wenn Fahrer aktiv (Tracking oder Fahrt läuft)
-      // Erkennbar: manualEndedAt === 0 und activeRides oder positions befüllt
-      // Einfache Heuristik: positions.size > 0 = Fahrer-Session aktiv
-      return positions.size > 0 || activeRides.size > 0;
-    }
-
-    function setMode(mode) {
-      if (mode === appMode) return;
-      if (isModeLocked()) {
-        showHint("Erst aktive Fahrt / Tracking beenden.");
-        return;
-      }
-      appMode = mode;
-      localStorage.setItem("er_mode", mode);
-      renderModeUI();
-    }
-
     function renderModeUI() {
-      const btnDriver    = document.getElementById("btnModeDriver");
-      const btnPassenger = document.getElementById("btnModePassenger");
-      const driverPanel  = document.getElementById("driverPanel");
       const passengerPanel = document.getElementById("passengerPanel");
-      if (!btnDriver) return;
-
-      const locked = isModeLocked();
-
-      btnDriver.classList.toggle("active", appMode === "driver");
-      btnPassenger.classList.toggle("active", appMode === "passenger");
-
-      // Anderer Modus-Button sperren wenn aktive Session
-      btnDriver.disabled    = locked && appMode !== "driver";
-      btnPassenger.disabled = locked && appMode !== "passenger";
-
-      driverPanel.style.display    = appMode === "driver"    ? "" : "none";
-      passengerPanel.style.display = appMode === "passenger" ? "" : "none";
+      if (passengerPanel) passengerPanel.style.display = "";
     }
-
-    document.getElementById("btnModeDriver")?.addEventListener("click",    () => setMode("driver"));
-    document.getElementById("btnModePassenger")?.addEventListener("click", () => setMode("passenger"));
 
     // ─────────────────────────────────────────────────
     // MITFAHRER-PANEL LOGIK
@@ -2648,7 +2523,6 @@
       for (const dk of reactivatedDrivers) {
         fetchPositionWithRetry(dk).catch(() => {});
       }
-      renderModeUI(); // Lock-Zustand aktualisieren
 
       // Fahrer die nicht mehr in aktiven Rides sind:
       // Bei manuell beendeter Fahrt Marker sofort entfernen,
@@ -2952,45 +2826,6 @@
         onVisibilityOrPanelChange();
       });
 
-      document.getElementById("btnApply")?.addEventListener("click", async () => {
-        const df = document.getElementById("driverFilter");
-        currentFilter = df?.value?.trim() || "";
-        currentFilterKey = normId(currentFilter);
-        updateSelectedLayerFilter();
-        await fetchLatest(); await fetchRouteHistory(); refreshDriversSource(); onVisibilityOrPanelChange();
-      });
-
-      document.getElementById("btnAll")?.addEventListener("click", async () => {
-        const df = document.getElementById("driverFilter");
-        if (df) df.value = "";
-        currentFilter = ""; currentFilterKey = "";
-        updateSelectedLayerFilter();
-        if (markerPopup) { markerPopup.remove(); markerPopup = null; }
-        if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
-        map.easeTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, duration: 650 });
-        await fetchLatest(); await fetchRouteHistory();
-        await fetchActiveRides(); // NEU
-        refreshDriversSource(); onVisibilityOrPanelChange();
-      });
-
-      document.getElementById("btnToggleRoutes")?.addEventListener("click", () => {
-        routesVisible = !routesVisible;
-        if (map.getLayer("er-routes-line"))
-          map.setLayoutProperty("er-routes-line", "visibility", routesVisible ? "visible" : "none");
-        const btn = document.getElementById("btnToggleRoutes");
-        if (btn) btn.textContent = routesVisible ? "Ausblenden" : "Einblenden";
-      });
-
-      document.getElementById("btnActiveOnly")?.addEventListener("click", async () => {
-        activeOnlyMode = !activeOnlyMode;
-        const btn = document.getElementById("btnActiveOnly");
-        if (btn) btn.textContent = activeOnlyMode ? "Alle anzeigen" : "Aktive";
-        showHint(activeOnlyMode ? "Nur Fahrer mit aktiver Fahrt." : "Alle Fahrer.");
-        await fetchLatest(); await fetchRouteHistory();
-        await fetchActiveRides(); // Bug 3: Rides laden damit client-seitiger Filter greift
-        refreshDriversSource(); onVisibilityOrPanelChange();
-      });
-
       document.addEventListener("visibilitychange", () => { onVisibilityOrPanelChange(); });
 
       const debouncedReload = debounce(async () => {
@@ -3098,7 +2933,7 @@
         m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":1,"circle-stroke-color":"rgba(11,15,20,0.18)"}});
         m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-width":3,"circle-stroke-color":"#60a5fa","circle-opacity":0.92}});
         m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
-        m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;const rawId=f.properties?.rawId??"";const df=document.getElementById("driverFilter");if(df)df.value=rawId;currentFilter=String(rawId).trim();currentFilterKey=normId(currentFilter);updateSelectedLayerFilter();m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
+        m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
         m.on("mouseenter",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="pointer";});
         m.on("mouseleave",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="";});
         m.on("mouseenter",LAYER_POINTS,()=>{m.getCanvas().style.cursor="pointer";});
