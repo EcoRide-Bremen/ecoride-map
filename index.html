@@ -40,7 +40,7 @@
     }
     .panel-shell {
       width: min(420px, 100%);
-      height: min(82vh, 720px);
+      height: min(54vh, 460px);
       overflow: hidden;
       background: linear-gradient(180deg, var(--panelA), var(--panelB));
       backdrop-filter: blur(18px);
@@ -50,14 +50,13 @@
       padding: 10px 12px 16px;
       box-sizing: border-box;
       pointer-events: auto;
-      transform: translateY(calc(100% - 42px));
+      transform: translateY(calc(100% - 34px));
       transition: transform .28s ease;
       will-change: transform;
       touch-action: none;
       box-shadow: 0 -12px 32px rgba(0,0,0,0.22);
     }
-    .panel.panel-half .panel-shell { transform: translateY(52%); }
-    .panel.panel-full .panel-shell { transform: translateY(0); }
+    .panel.panel-half .panel-shell { transform: translateY(0); }
 
     .title {
       font-weight: 600;
@@ -90,8 +89,7 @@
       gap: 8px;
     }
     .toggle-icon { font-size: 12px; transition: transform .25s ease; }
-    .panel.panel-half .toggle-icon { transform: rotate(90deg); }
-    .panel.panel-full .toggle-icon { transform: rotate(180deg); }
+    .panel.panel-half .toggle-icon { transform: rotate(180deg); }
     /* ── Floating Theme-Toggle – Icon only, maximalistisch minimal ── */
     .theme-toggle {
       position: fixed;
@@ -2864,7 +2862,7 @@
         }
       });
 
-      const PANEL_STATES = ["collapsed", "half", "full"];
+      const PANEL_STATES = ["collapsed", "half"];
       let panelState = "collapsed";
 
       function getPanelEl() {
@@ -2881,7 +2879,7 @@
         panel.dataset.panelState = nextState;
         panel.classList.toggle("collapsed", nextState === "collapsed");
         panel.classList.toggle("panel-half", nextState === "half");
-        panel.classList.toggle("panel-full", nextState === "full");
+        panel.classList.remove("panel-full");
         panel.classList.remove("open");
         if (title) title.setAttribute("aria-expanded", nextState === "collapsed" ? "false" : "true");
         if (nextState === "collapsed") hideHint();
@@ -2895,7 +2893,7 @@
         if (!panel || !shell || !title || panel.dataset.bottomPanelReady === "1") return;
         panel.dataset.bottomPanelReady = "1";
 
-        const SNAP = { collapsed: 1, half: 0.52, full: 0 };
+        const SNAP = { collapsed: 1, half: 0 };
         let dragStartY = 0;
         let dragStartTranslate = 0;
         let dragging = false;
@@ -2949,7 +2947,7 @@
           title.releasePointerCapture?.(pointerId);
           pointerId = null;
           if (!moved) {
-            setPanelState(getPanelState() === "collapsed" ? "half" : getPanelState() === "half" ? "full" : "collapsed");
+            setPanelState(getPanelState() === "collapsed" ? "half" : "collapsed");
             return;
           }
           setPanelState(pickNearestState(current, height));
