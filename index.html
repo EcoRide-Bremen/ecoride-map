@@ -2894,6 +2894,7 @@
         panel.dataset.bottomPanelReady = "1";
 
         const SNAP = { collapsed: 1, half: 0 };
+        const DRAG_MIN = -Math.round(window.innerHeight * 0.20);
         let dragStartY = 0;
         let dragStartTranslate = 0;
         let dragging = false;
@@ -2931,7 +2932,7 @@
         title.addEventListener("pointermove", (e) => {
           if (!dragging || e.pointerId !== pointerId) return;
           const height = getShellHeight();
-          const next = clamp(dragStartTranslate + (e.clientY - dragStartY), 0, getTranslateForState("collapsed", height));
+          const next = clamp(dragStartTranslate + (e.clientY - dragStartY), DRAG_MIN, getTranslateForState("collapsed", height));
           if (Math.abs(e.clientY - dragStartY) > 6) moved = true;
           setTranslatePx(next);
         });
@@ -2940,7 +2941,7 @@
           if (!dragging || (e && e.pointerId !== pointerId)) return;
           const height = getShellHeight();
           const current = moved
-            ? clamp(dragStartTranslate + ((e?.clientY ?? dragStartY) - dragStartY), 0, getTranslateForState("collapsed", height))
+            ? clamp(dragStartTranslate + ((e?.clientY ?? dragStartY) - dragStartY), DRAG_MIN, getTranslateForState("collapsed", height))
             : dragStartTranslate;
           dragging = false;
           clearDragTranslate();
