@@ -2900,10 +2900,9 @@
 
         const compactHeight = () => 34;
         const halfHeight = () => Math.min(window.innerHeight * 0.54, 460);
-        const maxDragHeight = () => Math.min(window.innerHeight * 0.75, 640);
         const getStateHeight = (state) => state === "half" ? halfHeight() : compactHeight();
         const getCurrentHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || getStateHeight(getPanelState());
-        const clampHeight = (value) => Math.max(compactHeight(), Math.min(maxDragHeight(), value));
+        const clampHeight = (value) => Math.max(compactHeight(), Math.min(halfHeight(), value));
         const setDragHeight = (height) => {
           shell.style.transition = "none";
           shell.style.height = `${height}px`;
