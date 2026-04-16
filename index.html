@@ -28,18 +28,32 @@
     #map { position:absolute; inset:0; }
 
     .panel {
-      position:absolute; left:20px; top:20px; z-index:5;
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      top: auto;
+      z-index: 5;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .panel-shell {
+      width: min(360px, calc(100vw - 40px));
+      min-width: 320px;
+      max-height: min(68vh, 560px);
+      overflow: hidden;
       background: linear-gradient(180deg, var(--panelA), var(--panelB));
       backdrop-filter: blur(18px);
       border: 1px solid var(--line);
       border-radius: 16px;
       padding: 12px;
-      width: min(360px, calc(100vw - 40px));
-      min-width: 320px;
-      max-height: 560px;
-      transition: max-height .3s ease;
+      box-sizing: border-box;
+      pointer-events: auto;
+      transition: max-height .28s ease, padding .28s ease;
     }
-    .panel.collapsed { max-height: 54px; padding: 10px 12px; }
+    .panel.collapsed .panel-shell { max-height: 54px; padding: 10px 12px; }
+    .panel.open .panel-shell { max-height: min(68vh, 560px); }
 
     .title {
       font-weight: 600;
@@ -680,8 +694,9 @@
   <div id="map"></div>
   <button class="theme-toggle" id="btnNightMode" title="Dark / Light umschalten" aria-label="Theme wechseln">🌙</button>
 
-  <div class="panel collapsed">
-    <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
+  <div class="panel collapsed" id="bottomPanel">
+    <div class="panel-shell">
+      <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
 
     <!-- ── MITFAHRER-PANEL ── -->
     <div class="mode-panel" id="passengerPanel">
@@ -750,6 +765,7 @@
       <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
     </div><!-- /passengerPanel -->
 
+    </div>
   </div>
 
   <!-- Lokale Keys: config.js wird nicht in Git eingecheckt -->
@@ -2821,8 +2837,12 @@
       });
 
       document.getElementById("panelTitle")?.addEventListener("click", () => {
-        document.querySelector(".panel")?.classList.toggle("collapsed");
-        if (document.querySelector(".panel")?.classList.contains("collapsed")) hideHint();
+        const panel = document.getElementById("bottomPanel") || document.querySelector(".panel");
+        if (!panel) return;
+        const willOpen = panel.classList.contains("collapsed");
+        panel.classList.toggle("collapsed", !willOpen);
+        panel.classList.toggle("open", willOpen);
+        if (!willOpen) hideHint();
         onVisibilityOrPanelChange();
       });
 
