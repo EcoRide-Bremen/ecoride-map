@@ -2901,7 +2901,8 @@
         const compactHeight = () => 34;
         const halfHeight = () => Math.min(window.innerHeight * 0.54, 460);
         const maxDragHeight = () => Math.min(window.innerHeight * 0.75, 640);
-        const getCurrentHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || halfHeight();
+        const getStateHeight = (state) => state === "half" ? halfHeight() : compactHeight();
+        const getCurrentHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || getStateHeight(getPanelState());
         const clampHeight = (value) => Math.max(compactHeight(), Math.min(maxDragHeight(), value));
         const setDragHeight = (height) => {
           shell.style.transition = "none";
@@ -2922,8 +2923,8 @@
           pointerId = e.pointerId;
           dragging = true;
           startY = e.clientY;
-          startH = getCurrentHeight();
-          shell.style.transition = "none";
+          startH = getStateHeight(getPanelState());
+          setDragHeight(startH);
           title.setPointerCapture?.(pointerId);
         });
 
@@ -2938,9 +2939,9 @@
           if (!dragging || (e && e.pointerId !== pointerId)) return;
           const finalHeight = getCurrentHeight();
           dragging = false;
-          clearDragHeight();
           title.releasePointerCapture?.(pointerId);
           pointerId = null;
+          clearDragHeight();
           snapToState(finalHeight);
         };
 
