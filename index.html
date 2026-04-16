@@ -29,9 +29,9 @@
 
     .panel {
       position: absolute;
-      left: 20px;
-      right: 20px;
-      bottom: 20px;
+      left: 12px;
+      right: 12px;
+      bottom: 0;
       top: auto;
       z-index: 5;
       display: flex;
@@ -39,35 +39,59 @@
       pointer-events: none;
     }
     .panel-shell {
-      width: min(360px, calc(100vw - 40px));
-      min-width: 320px;
-      max-height: min(68vh, 560px);
+      width: min(420px, 100%);
+      height: min(82vh, 720px);
       overflow: hidden;
       background: linear-gradient(180deg, var(--panelA), var(--panelB));
       backdrop-filter: blur(18px);
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 12px;
+      border-bottom: none;
+      border-radius: 24px 24px 0 0;
+      padding: 10px 12px 16px;
       box-sizing: border-box;
       pointer-events: auto;
-      transition: max-height .28s ease, padding .28s ease;
+      transform: translateY(calc(100% - 42px));
+      transition: transform .28s ease;
+      will-change: transform;
+      touch-action: none;
+      box-shadow: 0 -12px 32px rgba(0,0,0,0.22);
     }
-    .panel.collapsed .panel-shell { max-height: 54px; padding: 10px 12px; }
-    .panel.open .panel-shell { max-height: min(68vh, 560px); }
+    .panel.panel-half .panel-shell { transform: translateY(52%); }
+    .panel.panel-full .panel-shell { transform: translateY(0); }
 
     .title {
       font-weight: 600;
       color: var(--ink);
       margin: 0;
-      padding: 6px 0;
+      padding: 2px 0 8px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      cursor: pointer;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
     }
-    .toggle-icon { font-size: 12px; margin-left: 10px; transition: transform .25s ease; }
-    .panel.collapsed .toggle-icon { transform: rotate(180deg); }
+    .title:active { cursor: grabbing; }
+    .panel-handle {
+      width: 52px;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.28);
+      display: block;
+      flex-shrink: 0;
+    }
+    .title-text {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .toggle-icon { font-size: 12px; transition: transform .25s ease; }
+    .panel.panel-half .toggle-icon { transform: rotate(90deg); }
+    .panel.panel-full .toggle-icon { transform: rotate(180deg); }
     /* ── Floating Theme-Toggle – Icon only, maximalistisch minimal ── */
     .theme-toggle {
       position: fixed;
@@ -674,7 +698,8 @@
     .er-pop-status.err { background: rgba(239,68,68,0.12); color: #f87171; display:block; }
 
     @media (max-width: 900px) {
-      .panel { left:12px; top:12px; right:12px; width:auto; min-width: 280px; }
+      .panel { left:12px; right:12px; bottom:0; top:auto; width:auto; min-width: 280px; }
+      .panel-shell { width: 100%; }
       input { height: 40px; font-size: 15px; }
       button { height: 36px; font-size: 14px; }
       .hint-inline { max-width: 160px; }
@@ -694,9 +719,12 @@
   <div id="map"></div>
   <button class="theme-toggle" id="btnNightMode" title="Dark / Light umschalten" aria-label="Theme wechseln">🌙</button>
 
-  <div class="panel collapsed" id="bottomPanel">
-    <div class="panel-shell">
-      <p class="title" id="panelTitle">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></p>
+  <div class="panel collapsed" id="bottomPanel" data-panel-state="collapsed">
+    <div class="panel-shell" id="panelShell">
+      <div class="title" id="panelTitle" role="button" aria-expanded="false" aria-label="Panel ziehen oder öffnen">
+        <span class="panel-handle" aria-hidden="true"></span>
+        <span class="title-text">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></span>
+      </div>
 
     <!-- ── MITFAHRER-PANEL ── -->
     <div class="mode-panel" id="passengerPanel">
@@ -2836,15 +2864,104 @@
         }
       });
 
-      document.getElementById("panelTitle")?.addEventListener("click", () => {
-        const panel = document.getElementById("bottomPanel") || document.querySelector(".panel");
-        if (!panel) return;
-        const willOpen = panel.classList.contains("collapsed");
-        panel.classList.toggle("collapsed", !willOpen);
-        panel.classList.toggle("open", willOpen);
-        if (!willOpen) hideHint();
+      const PANEL_STATES = ["collapsed", "half", "full"];
+      let panelState = "collapsed";
+
+      function getPanelEl() {
+        return document.getElementById("bottomPanel") || document.querySelector(".panel");
+      }
+      function getPanelState() {
+        return panelState;
+      }
+      function setPanelState(nextState) {
+        const panel = getPanelEl();
+        const title = document.getElementById("panelTitle");
+        if (!panel || !PANEL_STATES.includes(nextState)) return;
+        panelState = nextState;
+        panel.dataset.panelState = nextState;
+        panel.classList.toggle("collapsed", nextState === "collapsed");
+        panel.classList.toggle("panel-half", nextState === "half");
+        panel.classList.toggle("panel-full", nextState === "full");
+        panel.classList.remove("open");
+        if (title) title.setAttribute("aria-expanded", nextState === "collapsed" ? "false" : "true");
+        if (nextState === "collapsed") hideHint();
         onVisibilityOrPanelChange();
-      });
+      }
+
+      function initBottomPanel() {
+        const panel = getPanelEl();
+        const shell = document.getElementById("panelShell");
+        const title = document.getElementById("panelTitle");
+        if (!panel || !shell || !title || panel.dataset.bottomPanelReady === "1") return;
+        panel.dataset.bottomPanelReady = "1";
+
+        const SNAP = { collapsed: 1, half: 0.52, full: 0 };
+        let dragStartY = 0;
+        let dragStartTranslate = 0;
+        let dragging = false;
+        let moved = false;
+        let pointerId = null;
+
+        const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+        const getShellHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || 1;
+        const getTranslateForState = (state, height = getShellHeight()) => height * (SNAP[state] ?? SNAP.collapsed);
+        const setTranslatePx = (px) => {
+          shell.style.transition = "none";
+          shell.style.transform = `translateY(${px}px)`;
+        };
+        const clearDragTranslate = () => {
+          shell.style.transition = "";
+          shell.style.transform = "";
+        };
+        const pickNearestState = (px, height = getShellHeight()) => {
+          return PANEL_STATES.reduce((best, state) => {
+            const currentDist = Math.abs(px - getTranslateForState(state, height));
+            const bestDist = Math.abs(px - getTranslateForState(best, height));
+            return currentDist < bestDist ? state : best;
+          }, "collapsed");
+        };
+
+        title.addEventListener("pointerdown", (e) => {
+          pointerId = e.pointerId;
+          dragging = true;
+          moved = false;
+          dragStartY = e.clientY;
+          dragStartTranslate = getTranslateForState(getPanelState());
+          title.setPointerCapture?.(pointerId);
+        });
+
+        title.addEventListener("pointermove", (e) => {
+          if (!dragging || e.pointerId !== pointerId) return;
+          const height = getShellHeight();
+          const next = clamp(dragStartTranslate + (e.clientY - dragStartY), 0, getTranslateForState("collapsed", height));
+          if (Math.abs(e.clientY - dragStartY) > 6) moved = true;
+          setTranslatePx(next);
+        });
+
+        const finishDrag = (e) => {
+          if (!dragging || (e && e.pointerId !== pointerId)) return;
+          const height = getShellHeight();
+          const current = moved
+            ? clamp(dragStartTranslate + ((e?.clientY ?? dragStartY) - dragStartY), 0, getTranslateForState("collapsed", height))
+            : dragStartTranslate;
+          dragging = false;
+          clearDragTranslate();
+          title.releasePointerCapture?.(pointerId);
+          pointerId = null;
+          if (!moved) {
+            setPanelState(getPanelState() === "collapsed" ? "half" : getPanelState() === "half" ? "full" : "collapsed");
+            return;
+          }
+          setPanelState(pickNearestState(current, height));
+        };
+
+        title.addEventListener("pointerup", finishDrag);
+        title.addEventListener("pointercancel", finishDrag);
+        title.addEventListener("lostpointercapture", finishDrag);
+        setPanelState(panel.dataset.panelState || "collapsed");
+      }
+
+      initBottomPanel();
 
       document.addEventListener("visibilitychange", () => { onVisibilityOrPanelChange(); });
 
