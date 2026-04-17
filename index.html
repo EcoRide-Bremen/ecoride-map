@@ -50,7 +50,7 @@
       padding: 10px 12px 16px;
       box-sizing: border-box;
       pointer-events: auto;
-      transform: translateY(calc(100% - 34px));
+      transform: translateY(calc(100% - 56px));
       transition: transform .28s ease;
       will-change: transform;
       touch-action: none;
@@ -2893,62 +2893,86 @@
         if (!panel || !shell || !title || panel.dataset.bottomPanelReady === "1") return;
         panel.dataset.bottomPanelReady = "1";
 
+        const SNAP = { collapsed: 1, half: 0.52 };
+        const SNAP_STATES = ["collapsed", "half"];
+        const MAX_OPEN_RATIO = 0.25;
+        let dragStartY = 0;
+        let dragStartTranslate = 0;
         let dragging = false;
-        let startY = 0;
-        let startH = 0;
+        let moved = false;
         let pointerId = null;
+        let suppressClickUntil = 0;
 
-        const compactHeight = () => 34;
-        const halfHeight = () => Math.min(window.innerHeight * 0.54, 460);
-        const getStateHeight = (state) => state === "half" ? halfHeight() : compactHeight();
-        const getCurrentHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || getStateHeight(getPanelState());
-        const clampHeight = (value) => Math.max(compactHeight(), Math.min(halfHeight(), value));
-        const setDragHeight = (height) => {
+        const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+        const getShellHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || 1;
+        const getTranslateForState = (state, height = getShellHeight()) => height * (SNAP[state] ?? SNAP.collapsed);
+        const getMinTranslate = (height = getShellHeight()) => height * MAX_OPEN_RATIO;
+        const setTranslatePx = (px) => {
           shell.style.transition = "none";
-          shell.style.height = `${height}px`;
-          shell.style.transform = "translateY(0)";
+          shell.style.transform = `translateY(${px}px)`;
         };
-        const clearDragHeight = () => {
+        const clearDragTranslate = () => {
           shell.style.transition = "";
-          shell.style.height = "";
           shell.style.transform = "";
         };
-        const snapToState = (height) => {
-          const threshold = (compactHeight() + halfHeight()) / 2;
-          setPanelState(height > threshold ? "half" : "collapsed");
+        const pickNearestState = (px, height = getShellHeight()) => {
+          return SNAP_STATES.reduce((best, state) => {
+            const currentDist = Math.abs(px - getTranslateForState(state, height));
+            const bestDist = Math.abs(px - getTranslateForState(best, height));
+            return currentDist < bestDist ? state : best;
+          }, "collapsed");
         };
 
         title.addEventListener("pointerdown", (e) => {
           pointerId = e.pointerId;
           dragging = true;
-          startY = e.clientY;
-          startH = getStateHeight(getPanelState());
-          setDragHeight(startH);
+          moved = false;
+          dragStartY = e.clientY;
+          dragStartTranslate = getTranslateForState(getPanelState());
           title.setPointerCapture?.(pointerId);
         });
 
         title.addEventListener("pointermove", (e) => {
           if (!dragging || e.pointerId !== pointerId) return;
-          const dy = startY - e.clientY;
-          const nextHeight = clampHeight(startH + dy);
-          setDragHeight(nextHeight);
+          const height = getShellHeight();
+          const next = clamp(
+            dragStartTranslate + (e.clientY - dragStartY),
+            getMinTranslate(height),
+            getTranslateForState("collapsed", height)
+          );
+          if (Math.abs(e.clientY - dragStartY) > 6) moved = true;
+          setTranslatePx(next);
         });
 
         const finishDrag = (e) => {
           if (!dragging || (e && e.pointerId !== pointerId)) return;
-          const finalHeight = getCurrentHeight();
+          const height = getShellHeight();
+          const current = moved
+            ? clamp(
+                dragStartTranslate + ((e?.clientY ?? dragStartY) - dragStartY),
+                getMinTranslate(height),
+                getTranslateForState("collapsed", height)
+              )
+            : dragStartTranslate;
           dragging = false;
+          clearDragTranslate();
           title.releasePointerCapture?.(pointerId);
           pointerId = null;
-          clearDragHeight();
-          snapToState(finalHeight);
+          if (moved) {
+            suppressClickUntil = Date.now() + 250;
+            setPanelState(pickNearestState(current, height));
+          }
         };
 
         title.addEventListener("pointerup", finishDrag);
         title.addEventListener("pointercancel", finishDrag);
         title.addEventListener("lostpointercapture", finishDrag);
         title.addEventListener("click", (e) => {
-          if (dragging) return;
+          if (Date.now() < suppressClickUntil) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
           e.preventDefault();
           setPanelState(getPanelState() === "collapsed" ? "half" : "collapsed");
         });
