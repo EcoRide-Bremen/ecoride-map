@@ -2896,8 +2896,8 @@
         const SNAP = { collapsed: 1, half: 0.52 };
         const SNAP_STATES = ["collapsed", "half"];
         const MAX_OPEN_RATIO = 0.25;
-        let dragStartY = 0;
-        let dragStartTranslate = 0;
+        let dragOffset = 0;
+        let dragCurrentTranslate = 0;
         let dragging = false;
         let moved = false;
         let pointerId = null;
@@ -2927,8 +2927,9 @@
           pointerId = e.pointerId;
           dragging = true;
           moved = false;
-          dragStartY = e.clientY;
-          dragStartTranslate = getTranslateForState(getPanelState());
+          const height = getShellHeight();
+          dragCurrentTranslate = getTranslateForState(getPanelState(), height);
+          dragOffset = e.clientY - dragCurrentTranslate;
           title.setPointerCapture?.(pointerId);
         });
 
@@ -2936,11 +2937,12 @@
           if (!dragging || e.pointerId !== pointerId) return;
           const height = getShellHeight();
           const next = clamp(
-            dragStartTranslate + (e.clientY - dragStartY),
+            e.clientY - dragOffset,
             getMinTranslate(height),
             getTranslateForState("collapsed", height)
           );
-          if (Math.abs(e.clientY - dragStartY) > 6) moved = true;
+          if (Math.abs(next - dragCurrentTranslate) > 6) moved = true;
+          dragCurrentTranslate = next;
           setTranslatePx(next);
         });
 
@@ -2949,11 +2951,11 @@
           const height = getShellHeight();
           const current = moved
             ? clamp(
-                dragStartTranslate + ((e?.clientY ?? dragStartY) - dragStartY),
+                (e?.clientY ?? (dragCurrentTranslate + dragOffset)) - dragOffset,
                 getMinTranslate(height),
                 getTranslateForState("collapsed", height)
               )
-            : dragStartTranslate;
+            : dragCurrentTranslate;
           dragging = false;
           clearDragTranslate();
           title.releasePointerCapture?.(pointerId);
