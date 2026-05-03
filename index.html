@@ -952,6 +952,8 @@
     let activeOnlyMode  = false;
     let currentFilter    = "";
     let currentFilterKey = "";
+    let selectedRouteDriverKey = "";
+    let selectedRouteCoords = null;
 
     // Impact
     let ridesPolTimer    = null;  // periodischer Rides-Poll
@@ -1722,6 +1724,78 @@
     function isValidLatLng(lat, lng) {
       return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
     }
+
+    function getDriverRideRouteCoords(driverKey) {
+      if (!driverKey) return null;
+      let bestRide = null;
+      let bestTs = 0;
+      for (const ride of activeRides.values()) {
+        if (normId(ride?.driver_id) !== driverKey) continue;
+        const rideTs = new Date(ride?.updated_at || ride?.created_at || 0).getTime() || 0;
+        if (!bestRide || rideTs >= bestTs) {
+          bestRide = ride;
+          bestTs = rideTs;
+        }
+      }
+      if (!bestRide) return null;
+
+      try {
+        const raw = bestRide.route_punkte;
+        if (Array.isArray(raw) && raw.length >= 2) {
+          const pts = raw
+            .map(p => [Number(p?.lng ?? p?.lon ?? p?.[0]), Number(p?.lat ?? p?.[1])])
+            .filter(([lng, lat]) => isValidLatLng(lat, lng));
+          if (pts.length >= 2) return pts;
+        }
+      } catch (_) {}
+
+      const fLat = Number(bestRide.fahrer_lat);
+      const fLng = Number(bestRide.fahrer_lng);
+      const zLat = Number(bestRide.ziel_lat);
+      const zLng = Number(bestRide.ziel_lng);
+      if (isValidLatLng(fLat, fLng) && isValidLatLng(zLat, zLng)) {
+        return [[fLng, fLat], [zLng, zLat]];
+      }
+      return null;
+    }
+
+    function refreshSelectedRouteSource() {
+      if (!map || !map.getSource("er-selected-route")) return;
+      const hasRoute = routesVisible
+        && selectedRouteDriverKey
+        && (!currentFilterKey || currentFilterKey === selectedRouteDriverKey)
+        && Array.isArray(selectedRouteCoords)
+        && selectedRouteCoords.length >= 2;
+      const features = hasRoute ? [{
+        type: "Feature",
+        properties: { driverKey: selectedRouteDriverKey },
+        geometry: { type: "LineString", coordinates: selectedRouteCoords }
+      }] : [];
+      map.getSource("er-selected-route").setData({ type: "FeatureCollection", features });
+    }
+
+    function persistSelectedDriverRoute(driverKey, routeCoords) {
+      if (!driverKey || !Array.isArray(routeCoords) || routeCoords.length < 2) return false;
+      selectedRouteDriverKey = driverKey;
+      selectedRouteCoords = routeCoords.map(([lng, lat]) => [Number(lng), Number(lat)]);
+      refreshSelectedRouteSource();
+      return true;
+    }
+
+    function showDriverRouteOnMap(driverKey, routeCoords) {
+      if (!map || !driverKey || !Array.isArray(routeCoords) || routeCoords.length < 2) return false;
+      const now = Date.now();
+      routePoints.set(driverKey, routeCoords.map(([lng, lat], idx) => ({ lng, lat, ts: now + idx })));
+      persistSelectedDriverRoute(driverKey, routeCoords);
+      refreshRoutesSource();
+      const bounds = routeCoords.reduce(
+        (acc, coord) => acc.extend(coord),
+        new mapboxgl.LngLatBounds(routeCoords[0], routeCoords[0])
+      );
+      map.fitBounds(bounds, { padding: 80, duration: 550, maxZoom: 14 });
+      return true;
+    }
+
     function validateConfigOrFail() {
       if (!CONFIG?.mapboxToken || !String(CONFIG.mapboxToken).startsWith("pk.")) {
         showHint("Mapbox Token fehlt."); return false;
@@ -1990,18 +2064,35 @@
         if (!routesVisible) {
           routesVisible = true;
           if (map.getLayer("er-routes-line")) map.setLayoutProperty("er-routes-line", "visibility", "visible");
+          if (map.getLayer("er-selected-route-line")) map.setLayoutProperty("er-selected-route-line", "visibility", "visible");
           const b = document.getElementById("btnToggleRoutes");
           if (b) b.textContent = "Ausblenden";
         }
+        const driverKey = props.driverKey || normId(rawId);
+        const fallbackRouteCoords = getDriverRideRouteCoords(driverKey);
         const df = document.getElementById("driverFilter");
         if (df) df.value = rawId;
         currentFilter = String(rawId).trim();
-        currentFilterKey = normId(currentFilter);
+        currentFilterKey = driverKey;
         updateSelectedLayerFilter();
-        const c = feature.geometry?.coordinates;
-        if (Array.isArray(c) && c.length === 2) map.easeTo({ center: c, zoom: 14, duration: 550 });
+
+        let routeShown = showDriverRouteOnMap(driverKey, fallbackRouteCoords);
+        if (!routeShown) {
+          const c = feature.geometry?.coordinates;
+          if (Array.isArray(c) && c.length === 2) map.easeTo({ center: c, zoom: 14, duration: 550 });
+        }
+
         await fetchLatest().catch(() => {});
         await fetchRouteHistory().catch(() => {});
+
+        const liveRouteCoords = (routePoints.get(driverKey) || []).map(p => [p.lng, p.lat]);
+        if (liveRouteCoords.length >= 2) {
+          persistSelectedDriverRoute(driverKey, liveRouteCoords);
+          routeShown = true;
+        } else if (!routePoints.has(driverKey)) {
+          routeShown = showDriverRouteOnMap(driverKey, fallbackRouteCoords) || routeShown;
+        }
+
         refreshDriversSource();
         onVisibilityOrPanelChange();
       });
@@ -2308,6 +2399,7 @@
         });
       }
       map.getSource("er-routes").setData({ type: "FeatureCollection", features });
+      refreshSelectedRouteSource();
       if (!isPanelOpen()) return;
       if (features.length === 0 && currentFilterKey) showHint("Keine Route für diesen Fahrer.");
       else if (features.length === 0) showHint("Keine Routen verfügbar.");
@@ -3087,6 +3179,9 @@
         m.on("mouseenter","er-routes-line",()=>{m.getCanvas().style.cursor="pointer";});
         m.on("mouseleave","er-routes-line",()=>{m.getCanvas().style.cursor="";});
       }
+      if (!m.getSource("er-selected-route")) {
+        m.addSource("er-selected-route", { type:"geojson", data:{type:"FeatureCollection",features:[]} });
+      }
       // Fahrer
       if (!m.getSource(DRIVERS_SOURCE)) {
         m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
@@ -3123,6 +3218,15 @@
           paint:{"line-color":"#6B7A8F","line-width":2.5,"line-opacity":0.7,"line-dasharray":[2,2]}
         });
       }
+      if (m.getSource("er-selected-route") && !m.getLayer("er-selected-route-line")) {
+        m.addLayer({
+          id:"er-selected-route-line",
+          type:"line",
+          source:"er-selected-route",
+          layout:{"line-join":"round","line-cap":"round","visibility": routesVisible ? "visible" : "none"},
+          paint:{"line-color":"#60a5fa","line-width":6,"line-opacity":0.96}
+        });
+      }
       // Ride-Ziele
       if (!m.getSource(RIDES_SOURCE)) {
         m.addSource(RIDES_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
@@ -3145,6 +3249,7 @@
           }
         });
       }
+      refreshSelectedRouteSource();
       const btn=document.getElementById("btnToggleRoutes");
       if(btn)btn.textContent=routesVisible?"Ausblenden":"Einblenden";
       routesReady=true;
