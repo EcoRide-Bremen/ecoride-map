@@ -935,7 +935,9 @@
     function getVisibleActiveRides() {
       return [...activeRides.entries()].filter(([, ride]) => {
         const driverKey = normId(ride.driver_id);
-        return !!driverKey && getDriverRouteState(driverKey) !== "hidden";
+        if (!driverKey) return false;
+        if (ride?.status === "angeboten") return true;
+        return getDriverRouteState(driverKey) !== "hidden";
       });
     }
 
@@ -1938,10 +1940,11 @@
       for (const [rideId, ride] of activeRides.entries()) {
         const driverKey = normId(ride.driver_id);
         if (!driverKey) continue;
-        const routeState = getDriverRouteState(driverKey);
+        const isOfferedRide = ride?.status === "angeboten";
+        const routeState = isOfferedRide ? "planned" : getDriverRouteState(driverKey);
         const candidateTs = new Date(ride.updated_at || ride.created_at || 0).getTime() || 0;
         const prev = canonicalRideByDriver.get(driverKey);
-        const rank = routeState === "active" ? 2 : routeState === "stale" ? 1 : 0;
+        const rank = routeState === "active" ? 3 : routeState === "stale" ? 2 : routeState === "planned" ? 1 : 0;
         if (!prev) {
           canonicalRideByDriver.set(driverKey, { rideId, ride, routeState, rank, candidateTs });
           continue;
@@ -1975,7 +1978,7 @@
         if (routeState !== "hidden") {
           destFeatures.push({
             type: "Feature",
-            properties: { ...props, stale: routeState === "stale" ? 1 : 0 },
+            properties: { ...props, stale: routeState === "stale" ? 1 : 0, rideStatus: ride.status || "aktiv" },
             geometry: { type: "Point", coordinates: [zLng, zLat] }
           });
         }
@@ -2008,7 +2011,7 @@
               driverId: ride.driver_id || "",
               route_state: routeState,
               stale: routeState === "stale" ? 1 : 0,
-              color: routeState === "active" ? "#B7D532" : "#6B7A8F"
+              color: routeState === "active" ? "#B7D532" : routeState === "planned" ? "#f59e0b" : "#6B7A8F"
             },
             geometry: { type: "LineString", coordinates: coords }
           });
@@ -2126,7 +2129,8 @@
       // Titel
       const title = document.createElement("div");
       title.className = "er-pop-title";
-      title.innerHTML = `<span>🚗 Fahrt verfügbar</span><span class="er-badge ride">AKTIV</span>`;
+      const rideStatus = props.rideStatus === 'angeboten' ? 'ANGEBOTEN' : 'AKTIV';
+      title.innerHTML = `<span>🚗 Fahrt verfügbar</span><span class="er-badge ride">${rideStatus}</span>`;
       root.appendChild(title);
 
       // Fahrer-Sub
@@ -2622,16 +2626,37 @@
     // ─────────────────────────────────────────────────
     async function fetchActiveRides() {
       const seq = ++ridesFetchSeq;
-      // Kein BBox-Filter: Fahrer-Position kann außerhalb der sichtbaren Karte liegen
-      // während die Route durch den sichtbaren Bereich führt → würde Route verschwinden lassen
-      // Rides sind durch LIMIT 200 begrenzt, BBox daher nicht nötig
-      let query = sb.from("v_aktive_fahrten").select(
-        "ride_id,driver_id,fahrer_name,fahrer_bewertung,fahrer_lat,fahrer_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte"
-      );
-
-      const { data, error } = await query.limit(200);
+      const [activeRes, offeredRes] = await Promise.all([
+        sb.from("v_aktive_fahrten").select(
+          "ride_id,driver_id,fahrer_name,fahrer_bewertung,fahrer_lat,fahrer_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,updated_at,created_at,status"
+        ).limit(200),
+        sb.from("rides").select(
+          "id,driver_id,start_lat,start_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,status,updated_at,created_at,departure_time"
+        ).eq("status", "angeboten").limit(200)
+      ]);
       if (seq !== ridesFetchSeq) return;
-      if (error) { logError("ERR_FETCH_RIDES", error.message); return; }
+      if (activeRes.error) { logError("ERR_FETCH_RIDES", activeRes.error.message); return; }
+      if (offeredRes.error) { logError("ERR_FETCH_OFFERED_RIDES", offeredRes.error.message); return; }
+      const data = [
+        ...((activeRes.data || []).map(row => ({ ...row, ride_id: row.ride_id || row.id, status: row.status || "aktiv" }))),
+        ...((offeredRes.data || []).map(row => ({
+          ride_id: row.id,
+          driver_id: row.driver_id,
+          fahrer_name: row.driver_id,
+          fahrer_bewertung: null,
+          fahrer_lat: row.start_lat,
+          fahrer_lng: row.start_lng,
+          ziel_lat: row.ziel_lat,
+          ziel_lng: row.ziel_lng,
+          plaetze: row.plaetze,
+          preis: row.preis,
+          route_punkte: row.route_punkte,
+          updated_at: row.updated_at,
+          created_at: row.created_at,
+          departure_time: row.departure_time,
+          status: row.status || "angeboten"
+        })))
+      ];
 
       // Fahrer die vorher aktiv waren merken
       const prevDriverKeys = new Set(
@@ -2788,7 +2813,7 @@
             }
           }
           if (!rideId) return;
-          if (ev === "UPDATE" && payload.new?.status !== "aktiv") {
+          if (ev === "UPDATE" && !["aktiv", "angeboten"].includes(payload.new?.status)) {
             activeRides.delete(rideId);
             const driverKey = normId(payload.new?.driver_id);
             if (driverKey) {
@@ -2803,14 +2828,34 @@
             resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
             return;
           }
-          if (ev === "INSERT" && payload.new?.status !== "aktiv") return;
+          if (ev === "INSERT" && !["aktiv", "angeboten"].includes(payload.new?.status)) return;
 
           // Sofort versuchen (View-JOIN braucht manchmal 1–2s)
           async function loadRideWithRetry(id, attempts = 3, delayMs = 1500) {
             for (let i = 0; i < attempts; i++) {
               if (i > 0) await new Promise(r => setTimeout(r, delayMs));
-              const { data, error } = await sb
-                .from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
+              const isOffered = payload.new?.status === "angeboten";
+              const rideRes = isOffered
+                ? await sb.from("rides").select("id,driver_id,start_lat,start_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,status,updated_at,created_at,departure_time").eq("id", id).single()
+                : await sb.from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
+              const data = isOffered && rideRes.data ? {
+                ride_id: rideRes.data.id,
+                driver_id: rideRes.data.driver_id,
+                fahrer_name: rideRes.data.driver_id,
+                fahrer_bewertung: null,
+                fahrer_lat: rideRes.data.start_lat,
+                fahrer_lng: rideRes.data.start_lng,
+                ziel_lat: rideRes.data.ziel_lat,
+                ziel_lng: rideRes.data.ziel_lng,
+                plaetze: rideRes.data.plaetze,
+                preis: rideRes.data.preis,
+                route_punkte: rideRes.data.route_punkte,
+                updated_at: rideRes.data.updated_at,
+                created_at: rideRes.data.created_at,
+                departure_time: rideRes.data.departure_time,
+                status: rideRes.data.status || "angeboten"
+              } : rideRes.data;
+              const error = rideRes.error;
               if (!error && data) {
                 const dk = normId(data.driver_id);
                 const wasBlocked = recentlyEnded.has(dk) || endedDrivers.has(dk);
