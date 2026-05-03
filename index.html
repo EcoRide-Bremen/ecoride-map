@@ -1733,7 +1733,7 @@
       let bestTs = 0;
       for (const ride of activeRides.values()) {
         if (normId(ride?.driver_id) !== driverKey) continue;
-        const rideTs = new Date(ride?.updated_at || ride?.created_at || 0).getTime() || 0;
+        const rideTs = new Date(ride?.updated_at || ride?.erstellt_am || ride?.departure_time || 0).getTime() || 0;
         if (!bestRide || rideTs >= bestTs) {
           bestRide = ride;
           bestTs = rideTs;
@@ -1942,7 +1942,7 @@
         if (!driverKey) continue;
         const isOfferedRide = ride?.status === "angeboten";
         const routeState = isOfferedRide ? "planned" : getDriverRouteState(driverKey);
-        const candidateTs = new Date(ride.updated_at || ride.created_at || 0).getTime() || 0;
+        const candidateTs = new Date(ride.updated_at || ride.erstellt_am || ride.departure_time || 0).getTime() || 0;
         const prev = canonicalRideByDriver.get(driverKey);
         const rank = routeState === "active" ? 3 : routeState === "stale" ? 2 : routeState === "planned" ? 1 : 0;
         if (!prev) {
@@ -2628,10 +2628,10 @@
       const seq = ++ridesFetchSeq;
       const [activeRes, offeredRes] = await Promise.all([
         sb.from("v_aktive_fahrten").select(
-          "ride_id,driver_id,fahrer_name,fahrer_bewertung,fahrer_lat,fahrer_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,updated_at,created_at,status"
+          "ride_id,driver_id,fahrer_name,fahrer_bewertung,fahrer_lat,fahrer_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,erstellt_am"
         ).limit(200),
         sb.from("rides").select(
-          "id,driver_id,start_lat,start_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,status,updated_at,created_at,departure_time"
+          "id,driver_id,start_lat,start_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,status,erstellt_am,departure_time"
         ).eq("status", "angeboten").limit(200)
       ]);
       if (seq !== ridesFetchSeq) return;
@@ -2651,8 +2651,7 @@
           plaetze: row.plaetze,
           preis: row.preis,
           route_punkte: row.route_punkte,
-          updated_at: row.updated_at,
-          created_at: row.created_at,
+          erstellt_am: row.erstellt_am,
           departure_time: row.departure_time,
           status: row.status || "angeboten"
         })))
@@ -2836,7 +2835,7 @@
               if (i > 0) await new Promise(r => setTimeout(r, delayMs));
               const isOffered = payload.new?.status === "angeboten";
               const rideRes = isOffered
-                ? await sb.from("rides").select("id,driver_id,start_lat,start_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,status,updated_at,created_at,departure_time").eq("id", id).single()
+                ? await sb.from("rides").select("id,driver_id,start_lat,start_lng,ziel_lat,ziel_lng,plaetze,preis,route_punkte,status,erstellt_am,departure_time").eq("id", id).single()
                 : await sb.from("v_aktive_fahrten").select("*").eq("ride_id", id).single();
               const data = isOffered && rideRes.data ? {
                 ride_id: rideRes.data.id,
@@ -2850,8 +2849,7 @@
                 plaetze: rideRes.data.plaetze,
                 preis: rideRes.data.preis,
                 route_punkte: rideRes.data.route_punkte,
-                updated_at: rideRes.data.updated_at,
-                created_at: rideRes.data.created_at,
+                erstellt_am: rideRes.data.erstellt_am,
                 departure_time: rideRes.data.departure_time,
                 status: rideRes.data.status || "angeboten"
               } : rideRes.data;
