@@ -16,49 +16,66 @@
     :root {
       --bg:#0b0f14;
       --text:#eaf0ff;
+      --fg:#eaf0ff;
       --muted:#9aa9c3;
+      --sheet-bg: rgba(14, 19, 30, 0.97);
+      --handle-bg: rgba(255,255,255,0.18);
       --panelA: rgba(17,24,37,0.45);
       --panelB: rgba(14,19,30,0.38);
-      --line: rgba(255,255,255,0.08);
+      --line: rgba(255,255,255,0.10);
       --accent: #c7df3a;
       --accentText:#0b0f14;
-      --ink: #111;
+      --ink: #eaf0ff;
+    }
+    body.theme-light {
+      --bg: #eef3fb;
+      --text: #111827;
+      --fg: #111827;
+      --muted: rgba(17,24,39,0.72);
+      --sheet-bg: rgba(255, 255, 255, 0.96);
+      --handle-bg: rgba(15,23,42,0.18);
+      --line: rgba(15,23,42,0.10);
+      --ink: #111827;
     }
     html, body { height:100%; margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
     #map { position:absolute; inset:0; }
 
     .panel {
       position: absolute;
-      left: 12px;
-      right: 12px;
+      left: 0;
+      right: 0;
       bottom: 0;
       top: auto;
-      z-index: 5;
+      z-index: 10;
       display: flex;
       justify-content: center;
       pointer-events: none;
     }
     .panel-shell {
-      width: min(420px, 100%);
-      height: min(54vh, 460px);
+      width: 100%;
+      height: 58vh;
       overflow: hidden;
-      background: linear-gradient(180deg, var(--panelA), var(--panelB));
+      display: flex;
+      flex-direction: column;
+      background: var(--sheet-bg);
       backdrop-filter: blur(18px);
       border: 1px solid var(--line);
       border-bottom: none;
-      border-radius: 24px 24px 0 0;
+      border-radius: 20px 20px 0 0;
       padding: 10px 12px 16px;
       box-sizing: border-box;
       pointer-events: auto;
-      transform: translateY(calc(100% - 56px));
-      transition: transform .28s ease;
-      will-change: transform;
-      touch-action: none;
+      transition: height .28s ease;
+      will-change: height;
+      touch-action: auto;
       box-shadow: 0 -12px 32px rgba(0,0,0,0.22);
     }
-    .panel.panel-half .panel-shell { transform: translateY(0); }
+    .panel.panel-half .panel-shell { height: 58vh; }
+    .panel.panel-mid .panel-shell { height: 30vh; }
+    .panel.collapsed .panel-shell { height: 10vh; padding-bottom: 10px; }
 
     .title {
+      flex-shrink: 0;
       font-weight: 600;
       color: var(--ink);
       margin: 0;
@@ -68,50 +85,73 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      cursor: grab;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: none;
     }
-    .title:active { cursor: grabbing; }
     .panel-handle {
-      width: 52px;
+      width: 48px;
       height: 5px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.28);
+      background: var(--handle-bg);
       display: block;
       flex-shrink: 0;
+      cursor: grab;
+      touch-action: none;
     }
     .title-text {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      text-align: center;
+      line-height: 1.2;
     }
-    .toggle-icon { font-size: 12px; transition: transform .25s ease; }
-    .panel.panel-half .toggle-icon { transform: rotate(180deg); }
+    .panel.collapsed .title {
+      flex: 1;
+      display: grid;
+      grid-template-rows: 5px minmax(0, 1fr);
+      align-items: stretch;
+      gap: 8px;
+      padding: 0;
+    }
+    .panel.collapsed .panel-handle {
+      justify-self: center;
+    }
+    .panel.collapsed .title-text {
+      align-self: center;
+      justify-self: center;
+    }
+    .panel-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+    }
+    .panel-body::-webkit-scrollbar { width: 3px; }
+    .panel-body::-webkit-scrollbar-thumb { background: rgba(199,223,58,0.25); border-radius: 999px; }
     /* ── Floating Theme-Toggle – Icon only, maximalistisch minimal ── */
-    .theme-toggle {
-      position: fixed;
-      bottom: 24px;
-      right: 16px;
-      z-index: 10;
+    .map-overlay-icon {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      z-index: 15;
       border: none;
-      background: transparent;
-      font-size: 20px;
+      background: none;
+      box-shadow: none;
+      color: var(--fg);
+      font-size: 19px;
       line-height: 1;
       cursor: pointer;
-      padding: 0;
-      min-width: unset;
-      display: block;
-      transition: transform .15s, opacity .15s;
+      padding: 8px;
+      opacity: 0.8;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.2s ease;
     }
-    /* Light Mode: Icon dunkel */
-    .theme-toggle { color: #111; text-shadow: 0 1px 3px rgba(255,255,255,0.4); }
-    /* Dark Mode: Icon hell */
-    body.night .theme-toggle { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
-    .theme-toggle:hover { transform: scale(1.15); }
-    .theme-toggle:active { transform: scale(0.90); opacity: 0.7; }
+    .map-overlay-icon:active { opacity: 0.5; }
 
     .row {
       display:flex;
@@ -127,10 +167,11 @@
     .panel.collapsed .stat2,
     .panel.collapsed .stat3,
     .panel.collapsed .stat4,
+    .panel.collapsed .panel-body,
     .panel.collapsed .mode-panel { display:none !important; }
 
     /* ── Mode-Panels ── */
-    .mode-panel { margin-top: 8px; }
+    .mode-panel { margin-top: 8px; min-height: 0; }
 
     /* ── Mitfahrer-Panel ── */
     /* ── Editable-Accordion: Header immer sichtbar, Body collapsible ── */
@@ -696,7 +737,7 @@
     .er-pop-status.err { background: rgba(239,68,68,0.12); color: #f87171; display:block; }
 
     @media (max-width: 900px) {
-      .panel { left:12px; right:12px; bottom:0; top:auto; width:auto; min-width: 280px; }
+      .panel { left:0; right:0; bottom:0; top:auto; width:auto; min-width: 0; }
       .panel-shell { width: 100%; }
       input { height: 40px; font-size: 15px; }
       button { height: 36px; font-size: 14px; }
@@ -715,17 +756,18 @@
 
 <body>
   <div id="map"></div>
-  <button class="theme-toggle" id="btnNightMode" title="Dark / Light umschalten" aria-label="Theme wechseln">🌙</button>
+  <div id="themeToggle" class="map-overlay-icon" role="button" tabindex="0" aria-label="Theme wechseln" title="Theme wechseln">◐</div>
 
   <div class="panel collapsed" id="bottomPanel" data-panel-state="collapsed">
     <div class="panel-shell" id="panelShell">
-      <div class="title" id="panelTitle" role="button" aria-expanded="false" aria-label="Panel ziehen oder öffnen">
-        <span class="panel-handle" aria-hidden="true"></span>
-        <span class="title-text">EcoRide – Live-Karte <span class="toggle-icon" aria-hidden="true">▼</span></span>
+      <div class="title" id="panelTitle">
+        <span class="panel-handle" role="button" tabindex="0" aria-expanded="false" aria-label="Panel ziehen oder öffnen"></span>
+        <span class="title-text" id="panelStatusText">EcoRide – Mitfahrer</span>
       </div>
 
-    <!-- ── MITFAHRER-PANEL ── -->
-    <div class="mode-panel" id="passengerPanel">
+      <div class="panel-body" id="panelBody">
+        <!-- ── MITFAHRER-PANEL ── -->
+        <div class="mode-panel" id="passengerPanel">
 
       <!-- Accordion Block 1: Treffpunkt – Header immer sichtbar -->
       <div class="pax-acc-block" id="paxAccBlock1">
@@ -789,7 +831,8 @@
       </div>
 
       <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
-    </div><!-- /passengerPanel -->
+        </div><!-- /passengerPanel -->
+      </div><!-- /panelBody -->
 
     </div>
   </div>
@@ -901,6 +944,11 @@
     let map         = null;
     let channel     = null;       // Realtime: live_positions
     let ridesChannel = null;      // NEU: Realtime: rides
+    let currentTheme = localStorage.getItem("ecoride-theme") || "dark";
+    const MAP_STYLES = {
+      dark: "mapbox://styles/mapbox/dark-v11",
+      light: "mapbox://styles/mapbox/streets-v12"
+    };
 
     const positions   = new Map();
     const routePoints = new Map();
@@ -1575,6 +1623,7 @@
       paxSearchActive = true;
       refreshPaxMatchLayer();
       updatePaxUI();
+      updatePanelSearchStatus();
 
       // Status-Zeile
       const statusEl = document.getElementById("paxMatchStatus");
@@ -1621,6 +1670,7 @@
       clearManualOpen();
       refreshPaxMatchLayer();
       updatePaxUI();
+      updatePanelSearchStatus();
       const statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) { statusEl.textContent = ""; statusEl.className = "pax-match-status"; }
       const listEl = document.getElementById("paxResultList");
@@ -2417,7 +2467,7 @@
       mapboxgl.accessToken = CONFIG.mapboxToken;
       const m = new mapboxgl.Map({
         container: "map",
-        style: nightMode ? NIGHT_STYLE : DAY_STYLE,
+        style: MAP_STYLES[currentTheme],
         center: DEFAULT_CENTER,
         zoom: DEFAULT_ZOOM,
       });
@@ -2997,7 +3047,7 @@
         }
       });
 
-      const PANEL_STATES = ["collapsed", "half"];
+      const PANEL_STATES = ["collapsed", "mid", "half"];
       let panelState = "collapsed";
 
       function getPanelEl() {
@@ -3006,17 +3056,31 @@
       function getPanelState() {
         return panelState;
       }
+      function setPanelStatusText(text) {
+        const status = document.getElementById("panelStatusText");
+        if (status) status.textContent = text || "";
+      }
+      function updatePanelSearchStatus() {
+        if (!paxSearchActive) {
+          setPanelStatusText("EcoRide – Mitfahrer");
+        } else if (paxMatchedKeys.size > 0) {
+          setPanelStatusText("Fahrer gefunden");
+        } else {
+          setPanelStatusText("Fahrer werden gesucht");
+        }
+      }
       function setPanelState(nextState) {
         const panel = getPanelEl();
-        const title = document.getElementById("panelTitle");
+        const handle = document.querySelector("#panelTitle .panel-handle");
         if (!panel || !PANEL_STATES.includes(nextState)) return;
         panelState = nextState;
         panel.dataset.panelState = nextState;
         panel.classList.toggle("collapsed", nextState === "collapsed");
+        panel.classList.toggle("panel-mid", nextState === "mid");
         panel.classList.toggle("panel-half", nextState === "half");
         panel.classList.remove("panel-full");
         panel.classList.remove("open");
-        if (title) title.setAttribute("aria-expanded", nextState === "collapsed" ? "false" : "true");
+        if (handle) handle.setAttribute("aria-expanded", nextState === "collapsed" ? "false" : "true");
         if (nextState === "collapsed") hideHint();
         onVisibilityOrPanelChange();
       }
@@ -3025,100 +3089,86 @@
         const panel = getPanelEl();
         const shell = document.getElementById("panelShell");
         const title = document.getElementById("panelTitle");
-        if (!panel || !shell || !title || panel.dataset.bottomPanelReady === "1") return;
+        const handle = title?.querySelector(".panel-handle");
+        const dragTarget = handle || title;
+        if (!panel || !shell || !title || !dragTarget || panel.dataset.bottomPanelReady === "1") return;
         panel.dataset.bottomPanelReady = "1";
 
-        const SNAP = { collapsed: 1, half: 0.52 };
         const DRAG_THRESHOLD = 5;
         let pointerId = null;
         let dragging = false;
         let moved = false;
-        let dragOffset = 0;
-        let currentTranslate = 0;
+        let startY = 0;
+        let startH = 0;
+        let currentH = 0;
         let suppressClickUntil = 0;
 
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
         const getShellHeight = () => shell.getBoundingClientRect().height || shell.offsetHeight || 1;
-        const getTranslateForState = (state, height = getShellHeight()) => height * (SNAP[state] ?? SNAP.collapsed);
-        const getCurrentTranslate = (height = getShellHeight()) => {
-          const computed = window.getComputedStyle(shell).transform;
-          if (computed && computed !== "none") {
-            const match = computed.match(/matrix\(([^)]+)\)/) || computed.match(/matrix3d\(([^)]+)\)/);
-            if (match) {
-              const values = match[1].split(",").map(v => Number(v.trim()));
-              const y = values.length === 6 ? values[5] : values[13];
-              if (Number.isFinite(y)) return y;
-            }
-          }
-          return getTranslateForState(getPanelState(), height);
-        };
-        const getMinTranslate = (height = getShellHeight()) => getTranslateForState("half", height);
-        const getMaxTranslate = (height = getShellHeight()) => getTranslateForState("collapsed", height);
-        const setTranslatePx = (px) => {
+        const setHeightPx = (px) => {
           shell.style.transition = "none";
-          shell.style.transform = `translateY(${px}px)`;
+          shell.style.height = `${px}px`;
         };
-        const clearDragTranslate = () => {
+        const clearDragHeight = () => {
           shell.style.transition = "";
-          shell.style.transform = "";
+          shell.style.height = "";
         };
-        const pickNearestState = (px, height = getShellHeight()) => {
-          const collapsedY = getTranslateForState("collapsed", height);
-          const halfY = getTranslateForState("half", height);
-          return Math.abs(px - halfY) < Math.abs(px - collapsedY) ? "half" : "collapsed";
+        const pickSnapState = (height = getShellHeight()) => {
+          const vh = window.innerHeight;
+          if (height > vh * 0.44) return "half";
+          if (height > vh * 0.20) return "mid";
+          return "collapsed";
         };
 
-        title.addEventListener("pointerdown", (e) => {
-          const height = getShellHeight();
+        dragTarget.addEventListener("pointerdown", (e) => {
           pointerId = e.pointerId;
           dragging = true;
           moved = false;
-          currentTranslate = getCurrentTranslate(height);
-          dragOffset = e.clientY - currentTranslate;
+          startY = e.clientY;
+          startH = getShellHeight();
+          currentH = startH;
           shell.style.transition = "none";
-          title.setPointerCapture?.(pointerId);
+          dragTarget.setPointerCapture?.(pointerId);
         });
 
-        title.addEventListener("pointermove", (e) => {
+        dragTarget.addEventListener("pointermove", (e) => {
           if (!dragging || e.pointerId !== pointerId) return;
-          const height = getShellHeight();
-          const next = clamp(
-            e.clientY - dragOffset,
-            getMinTranslate(height),
-            getMaxTranslate(height)
-          );
-          if (Math.abs(next - currentTranslate) > DRAG_THRESHOLD) moved = true;
-          currentTranslate = next;
-          setTranslatePx(currentTranslate);
+          const dy = startY - e.clientY;
+          const next = clamp(startH + dy, 60, window.innerHeight * 0.85);
+          if (Math.abs(next - startH) > DRAG_THRESHOLD) moved = true;
+          currentH = next;
+          setHeightPx(currentH);
         });
 
         const finishDrag = (e) => {
           if (!dragging || (e && e.pointerId !== pointerId)) return;
-          const height = getShellHeight();
-          const finalTranslate = moved
-            ? clamp(currentTranslate, getMinTranslate(height), getMaxTranslate(height))
-            : getCurrentTranslate(height);
+          const finalH = moved ? currentH : getShellHeight();
           dragging = false;
-          title.releasePointerCapture?.(pointerId);
+          dragTarget.releasePointerCapture?.(pointerId);
           pointerId = null;
-          clearDragTranslate();
+          clearDragHeight();
           if (moved) {
             suppressClickUntil = Date.now() + 250;
-            setPanelState(pickNearestState(finalTranslate, height));
+            setPanelState(pickSnapState(finalH));
           }
         };
 
-        title.addEventListener("pointerup", finishDrag);
-        title.addEventListener("pointercancel", finishDrag);
-        title.addEventListener("lostpointercapture", finishDrag);
-        title.addEventListener("click", (e) => {
+        dragTarget.addEventListener("pointerup", finishDrag);
+        dragTarget.addEventListener("pointercancel", finishDrag);
+        dragTarget.addEventListener("lostpointercapture", finishDrag);
+        const togglePanelFromTap = (e) => {
           if (Date.now() < suppressClickUntil) {
             e.preventDefault();
             e.stopPropagation();
             return;
           }
           e.preventDefault();
+          e.stopPropagation();
           setPanelState(getPanelState() === "collapsed" ? "half" : "collapsed");
+        };
+        dragTarget.addEventListener("click", togglePanelFromTap);
+        dragTarget.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") togglePanelFromTap(e);
         });
         setPanelState(panel.dataset.panelState || "collapsed");
       }
@@ -3187,21 +3237,18 @@
 
     window.addEventListener("beforeunload", cleanup);
     window.addEventListener("pagehide",     cleanup);
-    // ─────────────────────────────────────────────────
-    // NACHT-MODUS
-    // ─────────────────────────────────────────────────
-    const NIGHT_STYLE = "mapbox://styles/mapbox/dark-v11";
-    const DAY_STYLE   = "mapbox://styles/mapbox/streets-v12";
-    let nightMode = localStorage.getItem("er_night_mode") === "1";
-
-    function applyNightMode(on) {
-      nightMode = on;
-      localStorage.setItem("er_night_mode", on ? "1" : "0");
-      document.body.classList.toggle("night", on);
-      const btn = document.getElementById("btnNightMode");
-      if (btn) btn.textContent = on ? "☀️" : "🌙";
-      if (!map) return;
-      map.setStyle(on ? NIGHT_STYLE : DAY_STYLE);
+    function applyTheme(theme, updateMap = true) {
+      currentTheme = theme;
+      document.body.classList.toggle("theme-light", theme === "light");
+      const btn = document.getElementById("themeToggle");
+      if (btn) {
+        btn.textContent = theme === "light" ? "☀" : "◑";
+        btn.style.color = theme === "light" ? "#111111" : "#ffffff";
+        btn.style.background = "transparent";
+      }
+      localStorage.setItem("ecoride-theme", theme);
+      if (!updateMap || !map) return;
+      map.setStyle(MAP_STYLES[theme]);
       // Layers nach Style-Wechsel neu hinzufügen
       map.once("style.load", () => {
         routesReady = false;
@@ -3210,6 +3257,10 @@
         refreshRoutesSource();
         refreshRidesSource();
       });
+    }
+
+    function toggleTheme() {
+      applyTheme(currentTheme === "dark" ? "light" : "dark");
     }
 
     function initMapboxLayers(m) {
@@ -3301,13 +3352,16 @@
     document.addEventListener("DOMContentLoaded", initMap);
     document.addEventListener("DOMContentLoaded", () => {
       initAccordionHandlers();
-      // Gespeicherten Modus sofort anwenden (vor Map-Init)
-      document.body.classList.toggle("night", nightMode);
-      const btn = document.getElementById("btnNightMode");
-      if (btn) btn.textContent = nightMode ? "☀️" : "🌙";
-      document.getElementById("btnNightMode")?.addEventListener("click", (e) => {
+      applyTheme(currentTheme, false);
+      document.getElementById("themeToggle")?.addEventListener("click", (e) => {
         e.stopPropagation();
-        applyNightMode(!nightMode);
+        toggleTheme();
+      });
+      document.getElementById("themeToggle")?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleTheme();
+        }
       });
     });
   </script>
