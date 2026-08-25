@@ -107,11 +107,13 @@
       text-align: center;
       line-height: 1.2;
     }
+    .panel:not(.collapsed) .title-text { display: none; }
     .panel.collapsed .title {
       flex: 1;
       display: grid;
       grid-template-rows: 5px minmax(0, 1fr);
       align-items: stretch;
+      align-content: center;
       gap: 8px;
       padding: 0;
     }
@@ -121,6 +123,8 @@
     .panel.collapsed .title-text {
       align-self: center;
       justify-self: center;
+      font-size: 21px;
+      line-height: 1.2;
     }
     .panel-body {
       flex: 1;
@@ -174,19 +178,46 @@
     .mode-panel { margin-top: 8px; min-height: 0; }
 
     /* ── Mitfahrer-Panel ── */
-    /* ── Editable-Accordion: Header immer sichtbar, Body collapsible ── */
-    .pax-acc-block {
-      border-top: 1px solid rgba(255,255,255,0.07);
-      margin-top: 2px;
+    .pax-brand-title {
+      padding: 2px 16px 3px;
+      font-family: inherit;
+      font-size: 21px;
+      font-weight: 750;
+      text-align: center;
+      color: var(--ink);
+      line-height: 1.12;
     }
-    .pax-acc-block:first-child { border-top: none; margin-top: 4px; }
+    .pax-flow-title {
+      padding: 1px 16px 8px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      color: var(--ink);
+    }
 
-    /* Header: immer sichtbar, klickbar zum Auf-/Zuklappen */
+    /* ── Fahrtwunsch-Karten: ganze Flaeche ist Touch-Ziel ── */
+    .pax-acc-block {
+      margin: 8px 16px 0;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      background: rgba(17,24,37,0.46);
+      overflow: hidden;
+    }
+    .pax-flow-title + .pax-acc-block { margin-top: 4px; }
+    body.theme-light .pax-acc-block {
+      background: rgba(255,255,255,0.82);
+      border-color: rgba(15,23,42,0.10);
+    }
+
+    /* Header: immer sichtbar, gesamte Karte klickbar zum Auf-/Zuklappen */
     .pax-acc-header {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      gap: 6px;
-      padding: 5px 10px 4px;
+      gap: 8px;
+      min-height: 62px;
+      padding: 12px 14px;
       cursor: pointer;
       user-select: none;
       -webkit-user-select: none;
@@ -196,33 +227,47 @@
     .pax-acc-header:active { opacity: 0.75; }
     /* Sperren wenn Suche aktiv */
     .pax-acc-header.locked { cursor: default; opacity: 0.6; pointer-events: none; }
+    .pax-acc-header.pickup-empty .pax-acc-edit { display: none; }
 
     .pax-acc-label {
-      font-size: 10px;
+      grid-column: 1;
+      font-size: 13px;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      color: rgba(234,240,255,0.40);
-      flex-shrink: 0;
-      min-width: 70px;
+      letter-spacing: 0;
+      color: var(--ink);
+      min-width: 0;
     }
     .pax-acc-value {
-      font-size: 11.5px;
-      color: rgba(234,240,255,0.55);
-      flex: 1;
+      grid-column: 1;
+      font-size: 12px;
+      color: var(--muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .pax-acc-value.set { color: #4ade80; }
     .pax-acc-edit {
-      font-size: 11px;
-      color: rgba(199,223,58,0.50);
-      flex-shrink: 0;
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      width: 32px;
+      height: 32px;
+      color: rgba(199,223,58,0.72);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       transition: color .15s;
     }
-    .pax-acc-header:not(.locked):hover .pax-acc-edit { color: rgba(199,223,58,0.90); }
-
+    .pax-acc-header:not(.locked):hover .pax-acc-edit { color: rgba(199,223,58,0.95); }
+    .pax-map-icon svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     /* Body: collapsible */
     .pax-acc-body {
       overflow: hidden;
@@ -236,9 +281,10 @@
       pointer-events: none;
     }
     .pax-acc-inner {
-      padding: 2px 10px 6px;
+      padding: 0 12px 12px;
       box-sizing: border-box;
     }
+    #paxAccBlock1 .pax-acc-inner { padding: 4px 14px 16px; }
 
     /* ── Komprimierte Block-Abstände ── */
     .pax-block {
@@ -254,36 +300,215 @@
       opacity: 0.40;
       margin-bottom: 4px;
     }
-    /* Schlankere Buttons */
+    /* Daumenfreundliche Buttons nach GPS-Client-Groessenhierarchie */
     .pax-btn {
       width: 100%;
       box-sizing: border-box;
-      height: 28px;
-      border-radius: 999px;
-      font-size: 12px;
+      min-height: 44px;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       border: 1px solid rgba(199,223,58,0.25);
       background: rgba(17,24,37,0.28);
       color: #e5e7eb;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      margin-bottom: 4px;
+      gap: 8px;
+      margin-bottom: 8px;
+      text-align: center;
     }
     .pax-btn.active-pax {
       background: rgba(199,223,58,0.85);
       color: #0b0f14;
       border-color: transparent;
     }
-    /* Kompakter Status */
-    .pax-status {
+    .pax-pickup-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .pax-choice-btn {
+      appearance: none;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 76px;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 0;
+      padding: 14px;
+      text-align: center;
+      background: rgba(255,255,255,0.04);
+      border-color: rgba(255,255,255,0.07);
+      color: var(--ink);
+      box-shadow: 0 0 0 rgba(255,255,255,0);
+      outline: none;
+    }
+    .pax-choice-btn.active-pax {
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      border-color: rgba(199,223,58,0.34);
+    }
+    .pax-choice-btn:focus,
+    .pax-choice-btn:focus-visible {
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      outline: none;
+    }
+    .pax-choice-btn:active {
+      opacity: 1;
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      border-color: rgba(255,255,255,0.92);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.16), 0 0 18px rgba(255,255,255,0.18) !important;
+      filter: none;
+      transform: none;
+    }
+    .pax-btn-main {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .pax-btn-sub {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.35;
+      color: rgba(229,231,235,0.66);
+    }
+    .pax-btn.active-pax .pax-btn-sub { color: rgba(11,15,20,0.70); }
+    .pax-choice-btn.active-pax .pax-btn-main { color: #4ade80; }
+    .pax-choice-btn.active-pax .pax-btn-sub { color: #4ade80; }
+    .pax-choice-separator {
+      align-self: center;
+      margin: -4px 0;
       font-size: 11px;
-      padding: 3px 4px;
+      font-weight: 700;
+      color: var(--muted);
+      opacity: .58;
+    }
+    .pax-location-search {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .pax-location-input {
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      padding: 10px 12px;
+      font-size: 15px;
+      line-height: 1.25;
+      outline: none;
+    }
+    .pax-location-input::placeholder { color: rgba(229,231,235,0.50); }
+    .pax-location-input:focus { border-color: rgba(199,223,58,0.42); }
+    .pax-location-results {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pax-location-results.show { display: flex; }
+    .pax-location-result {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 100%;
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(17,24,37,0.36);
+      color: var(--ink);
+      padding: 9px 12px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .pax-location-result-main {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .pax-location-result-sub {
+      font-size: 12px;
+      line-height: 1.25;
+      color: var(--muted);
+    }
+    .pax-location-message {
+      min-height: 16px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--muted);
+      text-align: center;
+    }
+    body.theme-light .pax-btn {
+      background: rgba(15,23,42,0.04);
+      color: #111827;
+      border-color: rgba(15,23,42,0.10);
+    }
+    body.theme-light .pax-btn.active-pax {
+      background: #c7d92c;
+      color: #0b0f14;
+      border-color: transparent;
+    }
+    body.theme-light .pax-choice-btn {
+      background: rgba(15,23,42,0.035);
+      border-color: rgba(15,23,42,0.08);
+      color: var(--ink);
+    }
+    body.theme-light .pax-choice-btn.active-pax {
+      background: rgba(15,23,42,0.035);
+      color: var(--ink);
+      border-color: rgba(199,223,58,0.44);
+    }
+    body.theme-light .pax-choice-btn:active {
+      background: rgba(15,23,42,0.035);
+      color: var(--ink);
+    }
+    body.theme-light .pax-choice-btn:focus,
+    body.theme-light .pax-choice-btn:focus-visible {
+      background: rgba(15,23,42,0.035);
+      color: var(--ink);
+    }
+    body.theme-light .pax-location-input {
+      background: rgba(15,23,42,0.035);
+      border-color: rgba(15,23,42,0.10);
+      color: var(--ink);
+    }
+    body.theme-light .pax-location-input::placeholder { color: rgba(17,24,39,0.48); }
+    body.theme-light .pax-location-result {
+      background: rgba(15,23,42,0.035);
+      border-color: rgba(15,23,42,0.08);
+      color: var(--ink);
+    }
+    body.theme-light .pax-btn-sub { color: rgba(17,24,39,0.62); }
+    body.theme-light .pax-btn.active-pax .pax-btn-sub { color: rgba(11,15,20,0.70); }
+    body.theme-light .pax-choice-btn.active-pax .pax-btn-main { color: #4ade80; }
+    body.theme-light .pax-choice-btn.active-pax .pax-btn-sub { color: #4ade80; }
+    /* Sekundaerer Status */
+    .pax-status {
+      font-size: 12px;
+      padding: 2px 0 0;
       color: rgba(234,240,255,0.70);
     }
     .pax-status.set { color: #4ade80; }
+    .pax-status.marker-active {
+      color: #4ade80;
+      font-weight: 700;
+    }
+    body.theme-light .pax-status { color: rgba(17,24,39,0.72); }
+    body.theme-light .pax-status.set { color: #4ade80; }
+    body.theme-light .pax-status.marker-active { color: #4ade80; }
     .pax-divider {
       border: none;
       border-top: 1px solid rgba(255,255,255,0.07);
@@ -317,81 +542,97 @@
       cursor: not-allowed;
     }
     .pax-locked-hint {
-      font-size: 10px;
+      font-size: 12px;
       opacity: 0.5;
       text-align: center;
-      padding: 2px 10px 0;
+      padding: 2px 0 0;
       display: none;
     }
     .pax-locked-hint.show { display: block; }
     .passenger-hint {
-      font-size: 10.5px;
-      opacity: 0.5;
+      font-size: 12px;
+      opacity: 0.62;
       text-align: center;
-      margin-top: 4px;
-      padding: 0 10px 4px;
+      margin: 8px 0 0;
+      padding: 0 16px 4px;
     }
 
-    /* ── Mitfahrer: Zeitfenster-Stepper (kompakter) ── */
-    .pax-stepper {
+    /* ── Mitfahrer: Zeitfeld nach GPS-Client-Prinzip ── */
+    .pax-time-inner {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      padding: 4px 10px 6px;
-    }
-    .pax-step-btn {
-      width: 38px; height: 38px;
-      min-width: unset !important;
-      border-radius: 50%;
-      font-size: 20px;
-      font-weight: 700;
-      line-height: 1;
-      border: 1px solid rgba(199,223,58,0.30);
-      background: rgba(17,24,37,0.35);
-      color: #e5e7eb;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 !important;
-      transition: background .15s;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-    }
-    .pax-step-btn:active { background: rgba(199,223,58,0.22); }
-    .pax-step-btn:disabled { opacity: 0.30; cursor: not-allowed; }
-    .pax-step-display {
-      flex: 1;
+      gap: 6px;
+      padding-top: 2px;
       text-align: center;
-      font-size: 16px;
-      font-weight: 700;
+    }
+    .pax-time-label {
+      font-size: 12px;
+      opacity: .6;
+    }
+    .pax-time-input-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+    .pax-time-input-wrap input {
+      text-align: center;
+      width: 100%;
+      max-width: 220px;
+      border-radius: 10px;
+      border: 1px solid rgba(199,223,58,0.18);
+      background: rgba(17,24,37,0.28);
       color: #eaf0ff;
-      min-width: 80px;
-      letter-spacing: 0.02em;
+      height: 44px;
+      padding: 10px 12px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      box-sizing: border-box;
+    }
+    body.theme-light .pax-time-input-wrap input {
+      background: rgba(255,255,255,0.82);
+      color: #111827;
+      border-color: rgba(15,23,42,0.10);
+    }
+    .pax-time-note {
+      text-align: center;
+      font-size: 12px;
+      opacity: .62;
     }
 
-    /* Zielmarker-Button: grüner Akzent zur visuellen Unterscheidung vom Treffpunkt */
+    /* Zielbearbeitung bleibt eine normale Kartenflaeche; Gruen nur als Statussprache. */
     #btnPaxTarget.active-pax {
-      background: rgba(74,222,128,0.85);
-      color: #0b0f14;
-      border-color: transparent;
+      background: rgba(17,24,37,0.28);
+      color: #e5e7eb;
+      border-color: rgba(199,223,58,0.25);
     }
     #paxTargetStatus.set { color: #4ade80; }
+    #btnPaxTarget.target-active {
+      color: #4ade80;
+      font-weight: 700;
+    }
+    body.theme-light #btnPaxTarget.active-pax {
+      background: rgba(15,23,42,0.04);
+      color: #111827;
+      border-color: rgba(15,23,42,0.10);
+    }
+    body.theme-light #btnPaxTarget.target-active { color: #4ade80; }
 
     /* ── Mitfahrer: Such-Buttons ── */
     .pax-search-actions {
       display: flex;
-      gap: 6px;
-      padding: 4px 10px 4px;
+      gap: 8px;
+      padding: 10px 16px 4px;
       box-sizing: border-box;
     }
     .pax-search-btn {
       flex: 1;
-      height: 30px;
-      border-radius: 999px;
-      font-size: 12.5px;
+      min-height: 46px;
+      border-radius: 12px;
+      font-size: 15px;
       font-weight: 700;
       cursor: pointer;
       border: none;
@@ -400,18 +641,34 @@
       transition: opacity .2s;
     }
     .pax-search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    body.theme-light .pax-search-btn {
+      background: #c7d92c;
+      color: #0b0f14;
+      border: none;
+      box-shadow: 0 1px 0 rgba(15,23,42,0.08);
+    }
+    body.theme-light .pax-search-btn:active { opacity: 0.75; }
+    body.theme-light .pax-search-btn:disabled {
+      opacity: 0.35;
+      box-shadow: none;
+    }
     .pax-cancel-btn {
       flex: 0 0 auto;
-      height: 30px;
-      padding: 0 12px;
-      border-radius: 999px;
-      font-size: 12px;
+      min-height: 46px;
+      padding: 0 14px;
+      border-radius: 12px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       border: 1px solid rgba(239,68,68,0.35);
       background: rgba(239,68,68,0.12);
       color: #f87171;
       display: none;
+    }
+    body.theme-light .pax-cancel-btn {
+      background: rgba(239,68,68,0.08);
+      color: #b91c1c;
+      border-color: rgba(239,68,68,0.28);
     }
     .pax-cancel-btn.show { display: flex; align-items: center; justify-content: center; }
 
@@ -762,75 +1019,112 @@
     <div class="panel-shell" id="panelShell">
       <div class="title" id="panelTitle">
         <span class="panel-handle" role="button" tabindex="0" aria-expanded="false" aria-label="Panel ziehen oder öffnen"></span>
-        <span class="title-text" id="panelStatusText">EcoRide – Mitfahrer</span>
+        <span class="title-text" id="panelStatusText">EcoRide</span>
       </div>
 
       <div class="panel-body" id="panelBody">
         <!-- ── MITFAHRER-PANEL ── -->
         <div class="mode-panel" id="passengerPanel">
+      <div class="pax-brand-title">EcoRide</div>
+      <div class="pax-flow-title">Plane deine Fahrt</div>
 
-      <!-- Accordion Block 1: Treffpunkt – Header immer sichtbar -->
+      <!-- Accordion Block 1: Abholpunkt – Header immer sichtbar -->
       <div class="pax-acc-block" id="paxAccBlock1">
         <div class="pax-acc-header" id="paxAccHeader1" role="button" aria-expanded="true">
-          <span class="pax-acc-label">Treffpunkt</span>
-          <span class="pax-acc-value" id="paxAccVal1">nicht gesetzt</span>
-          <span class="pax-acc-edit">✎</span>
+          <span class="pax-acc-label" id="paxAccLabel1">Wo möchtest du abgeholt werden?</span>
+          <span class="pax-acc-value" id="paxAccVal1"></span>
+          <span class="pax-acc-edit pax-map-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"></path>
+              <path d="M9 3v15"></path>
+              <path d="M15 6v15"></path>
+            </svg>
+          </span>
         </div>
         <div class="pax-acc-body" id="paxAccBody1">
           <div class="pax-acc-inner">
-            <button class="pax-btn" id="btnPaxGps">GPS-Standort verwenden</button>
-            <button class="pax-btn" id="btnPaxMarker">Marker setzen / verschieben</button>
-            <div class="pax-status" id="paxMarkerStatus">Kein Treffpunkt gesetzt</div>
+            <div class="pax-location-search" id="paxPickupLocationSearch">
+              <input
+                class="pax-location-input"
+                id="paxPickupLocationInput"
+                type="search"
+                inputmode="search"
+                placeholder="Adresse oder Ort"
+                autocomplete="off"
+                enterkeyhint="search"
+              />
+              <div class="pax-location-results" id="paxPickupLocationResults"></div>
+              <div class="pax-location-message" id="paxPickupLocationMessage"></div>
+            </div>
+            <div class="pax-pickup-options">
+              <button class="pax-btn pax-choice-btn" id="btnPaxGps">
+                <span class="pax-btn-main">GPS-Standort</span>
+                <span class="pax-btn-sub">GPS-Standort nicht aktiv</span>
+              </button>
+              <div class="pax-choice-separator">oder</div>
+              <button class="pax-btn pax-choice-btn" id="btnPaxMarker">
+                <span class="pax-btn-main">Treffpunkt</span>
+                <span class="pax-btn-sub">Treffpunkt nicht aktiv</span>
+              </button>
+            </div>
+            <div class="pax-status" id="paxMarkerStatus"></div>
           </div>
         </div>
       </div>
 
-      <!-- Accordion Block 2: Startzeit – sichtbar sobald Treffpunkt gesetzt -->
+      <!-- Accordion Block 3: Ziel – sichtbar sobald Abholpunkt gesetzt -->
+      <div class="pax-acc-block" id="paxAccBlock3" style="display:none">
+        <div class="pax-acc-header" id="paxAccHeader3" role="button" aria-expanded="false">
+          <span class="pax-acc-label">Ziel</span>
+          <span class="pax-acc-value" id="paxAccVal3">nicht gesetzt</span>
+          <span class="pax-acc-edit pax-map-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"></path>
+              <path d="M9 3v15"></path>
+              <path d="M15 6v15"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="pax-acc-body pax-closed" id="paxTargetBlock">
+          <div class="pax-acc-inner">
+            <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen</button>
+            <div class="pax-status" id="paxTargetStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion Block 2: Startzeitfenster – sichtbar sobald Abholpunkt gesetzt -->
       <div class="pax-acc-block" id="paxAccBlock2" style="display:none">
         <div class="pax-acc-header" id="paxAccHeader2" role="button" aria-expanded="false">
-          <span class="pax-acc-label">Startzeit</span>
-          <span class="pax-acc-value" id="paxAccVal2">nicht gesetzt</span>
-          <span class="pax-acc-edit">✎</span>
+          <span class="pax-acc-label">Wann möchtest du losfahren?</span>
+          <span class="pax-acc-value" id="paxAccVal2">HH:MM</span>
         </div>
         <div class="pax-acc-body pax-closed" id="paxTimeBlock">
           <div class="pax-acc-inner">
-            <div class="pax-stepper" id="paxStepper">
-              <button class="pax-step-btn" id="btnStepMinus" aria-label="Früher">−</button>
-              <div class="pax-step-display" id="paxStepDisplay">jetzt</div>
-              <button class="pax-step-btn" id="btnStepPlus" aria-label="Später">+</button>
+            <div class="pax-time-inner">
+              <div class="pax-time-label">Wann möchtest du losfahren?</div>
+              <div class="pax-time-input-wrap">
+                <input id="paxTimeInput" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" autocomplete="off" />
+              </div>
+              <div class="pax-time-note">Startzeitfenster für deine Fahrt</div>
             </div>
             <div class="pax-locked-hint" id="paxLockedHint">Suche abbrechen zum Ändern</div>
           </div>
         </div>
       </div>
 
-      <!-- Accordion Block 3: Ziel – sichtbar sobald Treffpunkt gesetzt -->
-      <div class="pax-acc-block" id="paxAccBlock3" style="display:none">
-        <div class="pax-acc-header" id="paxAccHeader3" role="button" aria-expanded="false">
-          <span class="pax-acc-label">Ziel</span>
-          <span class="pax-acc-value" id="paxAccVal3">nicht gesetzt</span>
-          <span class="pax-acc-edit">✎</span>
-        </div>
-        <div class="pax-acc-body pax-closed" id="paxTargetBlock">
-          <div class="pax-acc-inner">
-            <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen / verschieben</button>
-            <div class="pax-status" id="paxTargetStatus">Kein Ziel gesetzt</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Block 4: Suche starten – sichtbar wenn Treffpunkt + Ziel gesetzt -->
+      <!-- Block 4: Suche starten – sichtbar wenn Abholpunkt + Ziel gesetzt -->
       <div id="paxSearchBlock" style="display:none">
         <div class="pax-divider"></div>
         <div class="pax-search-actions">
-          <button class="pax-search-btn" id="btnPaxSearch">Passende Fahrer finden</button>
+          <button class="pax-search-btn" id="btnPaxSearch">Fahrer finden</button>
           <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
         </div>
         <div class="pax-match-status" id="paxMatchStatus"></div>
         <div class="pax-result-list" id="paxResultList"></div>
       </div>
 
-      <p class="passenger-hint" id="paxHint">Treffpunkt setzen um passende Fahrer zu sehen.</p>
+      <p class="passenger-hint" id="paxHint">Abholpunkt setzen um Fahrer zu finden.</p>
         </div><!-- /passengerPanel -->
       </div><!-- /panelBody -->
 
@@ -1041,11 +1335,15 @@
     // Zielmarker State
     let paxTargetLat    = null;
     let paxTargetLng    = null;
+    let paxPendingTargetLat = null;
+    let paxPendingTargetLng = null;
     let paxTargetMarker = null;
     let paxTargetMode   = false;
+    let paxTargetOpen   = false;
     let paxTimeOpen     = false;  // Stepper manuell geöffnet → updatePaxUI respektiert das
+    let paxTimeTouched  = false;  // Nutzer hat das Zeitfenster bewusst ein-/ausgeklappt
 
-    // GPS-Verifikation: Suche und Anfrage nur mit echtem GPS-Standort möglich
+    // GPS-Verifikation bleibt als Herkunftsinfo erhalten, ist aber kein Such-Gate
     let paxHasGps = false;
 
     // Cooldown-Schutz (nur nach „Abbrechen")
@@ -1067,9 +1365,15 @@
     let paxMarker      = null;  // Mapbox Marker für Treffpunkt
     let paxLat         = null;
     let paxLng         = null;
+    let paxPickupSource = null; // "gps" oder "map": Herkunft des gueltigen Abholpunkts
+    let paxPendingPickupLat = null;
+    let paxPendingPickupLng = null;
     let paxTimeMin     = 0;     // gewähltes Zeitfenster in Minuten (0 = jetzt)
+    let paxDesiredTime = null;  // stabile sichtbare Wunschzeit im Format HH:MM
+    let paxTimeUserSet = false; // true erst nach bewusst gueltiger Nutzereingabe
     let paxSearchActive = false; // Suche gestartet → Zeitfenster gesperrt
-    let paxMarkerMode  = false; // Nutzer kann Marker per Klick setzen
+    let paxPickupEditOpen = false; // Abholpunkt-Bearbeitung offen, Marker bleibt fixiert
+    let paxMarkerMode  = false; // Marker darf per Klick/Drag gesetzt oder verschoben werden
 
     // Gibt true zurück wenn Cooldown aktiv → Suchparameter dürfen nicht geändert werden
     function isPaxInputLocked() {
@@ -1092,8 +1396,19 @@
     function exitPaxMarkerMode() {
       if (!paxMarkerMode) return;
       paxMarkerMode = false;
+      if (hasPendingPaxPickup()) {
+        paxPendingPickupLat = null;
+        paxPendingPickupLng = null;
+        if (hasValidPaxPickup()) {
+          paxMarker?.setLngLat([paxLng, paxLat]);
+        } else if (paxMarker) {
+          paxMarker.remove();
+          paxMarker = null;
+        }
+      }
       const btn = document.getElementById("btnPaxMarker");
       if (btn) btn.classList.remove("active-pax");
+      syncPaxMarkerDraggable();
     }
 
     // ── Zielmarker ──
@@ -1107,48 +1422,117 @@
       paxTargetMarker.setDraggable(isPaxTargetDraggable());
     }
 
-    function setPaxTargetPos(lng, lat) {
-      if (isPaxInputLocked() || paxSearchActive) return;
-      paxTargetLng = lng; paxTargetLat = lat;
+    function ensurePaxTargetMarker(lng, lat) {
       if (!paxTargetMarker) {
         paxTargetMarker = new mapboxgl.Marker({ color: "#4ade80", draggable: isPaxTargetDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxTargetMarker.on("dragend", () => {
           const pos = paxTargetMarker.getLngLat();
-          paxTargetLng = pos.lng; paxTargetLat = pos.lat;
+          if (paxTargetMode) {
+            paxPendingTargetLng = pos.lng;
+            paxPendingTargetLat = pos.lat;
+          } else {
+            restorePaxTargetMarkerToConfirmed();
+          }
           updatePaxUI();
         });
       } else {
         paxTargetMarker.setLngLat([lng, lat]);
       }
+      syncPaxTargetMarkerDraggable();
+    }
+
+    function setPaxTargetPos(lng, lat) {
+      if (isPaxInputLocked() || paxSearchActive) return;
+      paxTargetLng = lng;
+      paxTargetLat = lat;
+      paxPendingTargetLng = null;
+      paxPendingTargetLat = null;
+      ensurePaxTargetMarker(lng, lat);
       updatePaxUI();
+    }
+
+    function hasPendingPaxTarget() {
+      return paxPendingTargetLat !== null && paxPendingTargetLng !== null;
+    }
+
+    function setPaxPendingTargetPos(lng, lat) {
+      if (isPaxInputLocked() || paxSearchActive) return;
+      paxPendingTargetLng = lng;
+      paxPendingTargetLat = lat;
+      ensurePaxTargetMarker(lng, lat);
+      updatePaxUI();
+    }
+
+    function restorePaxTargetMarkerToConfirmed() {
+      paxPendingTargetLng = null;
+      paxPendingTargetLat = null;
+      if (hasValidPaxTarget()) {
+        paxTargetMarker?.setLngLat([paxTargetLng, paxTargetLat]);
+      } else if (paxTargetMarker) {
+        paxTargetMarker.remove();
+        paxTargetMarker = null;
+      }
+      syncPaxTargetMarkerDraggable();
     }
 
     function exitPaxTargetMode() {
       if (!paxTargetMode) return;
       paxTargetMode = false;
+      restorePaxTargetMarkerToConfirmed();
       const btn = document.getElementById("btnPaxTarget");
       if (btn) btn.classList.remove("active-pax");
     }
 
+    function beginPaxTargetMode() {
+      paxPendingTargetLng = null;
+      paxPendingTargetLat = null;
+      paxTargetMode = true;
+      syncPaxTargetMarkerDraggable();
+    }
+
+    function confirmPaxPendingTarget() {
+      if (!hasPendingPaxTarget()) {
+        showHint("Ziel auf der Karte wählen.");
+        updatePaxUI();
+        return;
+      }
+      const lng = paxPendingTargetLng;
+      const lat = paxPendingTargetLat;
+      paxTargetMode = false;
+      paxTargetOpen = true;
+      const btn = document.getElementById("btnPaxTarget");
+      if (btn) btn.classList.remove("active-pax");
+      setPaxTargetPos(lng, lat);
+      showHint("Ziel aktiv.");
+      updatePaxUI();
+    }
+
     document.getElementById("btnPaxTarget")?.addEventListener("click", () => {
       if (paxTargetMode) {
-        paxTargetMode = false;
-        document.getElementById("btnPaxTarget").classList.remove("active-pax");
+        if (hasPendingPaxTarget()) {
+          confirmPaxPendingTarget();
+          return;
+        }
+        exitPaxTargetMode();
         updatePaxUI();
         return;
       }
       exitPaxMarkerMode(); // sicherstellen dass Treffpunkt-Modus beendet ist
-      paxTargetMode = true;
+      beginPaxTargetMode();
+      paxTargetOpen = true;
       document.getElementById("btnPaxTarget").classList.add("active-pax");
-      showHint("Ziel auf der Karte antippen.");
+      showHint("Ziel auf der Karte wählen.");
       updatePaxUI();
     });
 
     function setPaxMarkerPos(lng, lat, fromGps = false) {
       if (isPaxInputLocked()) return;
       paxLng = lng; paxLat = lat;
+      paxPickupSource = fromGps ? "gps" : "map";
+      paxPendingPickupLat = null;
+      paxPendingPickupLng = null;
       // GPS-Verifikation bleibt erhalten – Treffpunkt anpassen hebt Verifikation nicht auf
       if (!paxMarker) {
         paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
@@ -1156,14 +1540,367 @@
           .addTo(map);
         paxMarker.on("dragend", () => {
           const pos = paxMarker.getLngLat();
-          paxLng = pos.lng; paxLat = pos.lat;
-          // paxHasGps bleibt unverändert – Treffpunkt nachjustieren hebt Verifikation nicht auf
+          if (paxMarkerMode) {
+            paxPendingPickupLng = pos.lng;
+            paxPendingPickupLat = pos.lat;
+          }
           updatePaxUI();
         });
       } else {
         paxMarker.setLngLat([lng, lat]);
       }
       updatePaxUI();
+    }
+
+    function hasPendingPaxPickup() {
+      return paxPendingPickupLat !== null && paxPendingPickupLng !== null;
+    }
+
+    function setPaxPendingMarkerPos(lng, lat) {
+      if (isPaxInputLocked() || paxSearchActive) return;
+      paxPendingPickupLng = lng;
+      paxPendingPickupLat = lat;
+      if (!paxMarker) {
+        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        paxMarker.on("dragend", () => {
+          const pos = paxMarker.getLngLat();
+          if (paxMarkerMode) {
+            paxPendingPickupLng = pos.lng;
+            paxPendingPickupLat = pos.lat;
+          }
+          updatePaxUI();
+        });
+      } else {
+        paxMarker.setLngLat([lng, lat]);
+      }
+      syncPaxMarkerDraggable();
+      updatePaxUI();
+    }
+
+    function beginPaxMarkerMode() {
+      paxPendingPickupLng = null;
+      paxPendingPickupLat = null;
+      paxMarkerMode = true;
+      paxPickupEditOpen = true;
+      syncPaxMarkerDraggable();
+    }
+
+    function confirmPaxPendingPickup() {
+      if (!hasPendingPaxPickup()) {
+        if (hasValidPaxPickup()) {
+          exitPaxMarkerMode();
+          paxPickupEditOpen = true;
+          hideHint();
+          updatePaxUI();
+          return;
+        }
+        showHint("Treffpunkt auf der Karte wählen.");
+        updatePaxUI();
+        return;
+      }
+      paxLng = paxPendingPickupLng;
+      paxLat = paxPendingPickupLat;
+      paxPickupSource = "map";
+      paxPendingPickupLng = null;
+      paxPendingPickupLat = null;
+      exitPaxMarkerMode();
+      paxPickupEditOpen = true;
+      showHint("Treffpunkt aktiv.");
+      updatePaxUI();
+    }
+
+    function focusPaxPickupOnMap(lng, lat) {
+      if (!map) return;
+      const panel = document.getElementById("bottomPanel");
+      const panelHeight = panel?.getBoundingClientRect?.().height || 0;
+      const isMobile = window.matchMedia?.("(max-width: 900px)")?.matches;
+      const yOffset = isMobile ? -Math.min(220, Math.max(60, Math.round(panelHeight * 0.35))) : 0;
+      map.easeTo({ center: [lng, lat], zoom: 14, duration: 600, offset: [0, yOffset] });
+    }
+
+    const PAX_LOCATION_SUGGEST_LIMIT = 3;
+    let paxPickupLocationSessionToken = null;
+    let paxPickupLocationAbort = null;
+    let paxPickupLocationTimer = null;
+
+    function createSearchSessionToken() {
+      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === "x" ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function getPickupLocationSessionToken() {
+      if (!paxPickupLocationSessionToken) {
+        paxPickupLocationSessionToken = createSearchSessionToken();
+      }
+      return paxPickupLocationSessionToken;
+    }
+
+    function resetPickupLocationSession() {
+      paxPickupLocationSessionToken = null;
+    }
+
+    function setPickupLocationMessage(text) {
+      const el = document.getElementById("paxPickupLocationMessage");
+      if (el) el.textContent = text || "";
+    }
+
+    function clearPickupLocationResults() {
+      const resultsEl = document.getElementById("paxPickupLocationResults");
+      if (!resultsEl) return;
+      resultsEl.innerHTML = "";
+      resultsEl.classList.remove("show");
+    }
+
+    function getPickupLocationProximity() {
+      if (hasValidPaxPickup()) return `${paxLng},${paxLat}`;
+      const center = map?.getCenter?.();
+      return center ? `${center.lng},${center.lat}` : `${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`;
+    }
+
+    function getSuggestionLabel(suggestion) {
+      return suggestion?.name || suggestion?.place_formatted || suggestion?.full_address || suggestion?.address || "Ort";
+    }
+
+    function getSuggestionAddress(suggestion) {
+      return suggestion?.full_address || suggestion?.place_formatted || suggestion?.address || "";
+    }
+
+    function renderPickupLocationResults(suggestions) {
+      const resultsEl = document.getElementById("paxPickupLocationResults");
+      if (!resultsEl) return;
+      resultsEl.innerHTML = "";
+      const visible = suggestions.slice(0, PAX_LOCATION_SUGGEST_LIMIT);
+      visible.forEach(suggestion => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pax-location-result";
+
+        const main = document.createElement("span");
+        main.className = "pax-location-result-main";
+        main.textContent = getSuggestionLabel(suggestion);
+
+        const sub = document.createElement("span");
+        sub.className = "pax-location-result-sub";
+        sub.textContent = getSuggestionAddress(suggestion);
+
+        btn.append(main, sub);
+        btn.addEventListener("click", () => selectPickupLocationSuggestion(suggestion));
+        resultsEl.append(btn);
+      });
+      resultsEl.classList.toggle("show", visible.length > 0);
+    }
+
+    function normalizePickupLocationResult(feature, suggestion) {
+      const coords = feature?.geometry?.coordinates || feature?.properties?.coordinates;
+      const lng = Number(Array.isArray(coords) ? coords[0] : coords?.longitude);
+      const lat = Number(Array.isArray(coords) ? coords[1] : coords?.latitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      const props = feature?.properties || {};
+      return {
+        label: props.name || getSuggestionLabel(suggestion),
+        address: props.full_address || props.place_formatted || getSuggestionAddress(suggestion),
+        lat,
+        lng,
+        sourceType: props.feature_type || suggestion?.feature_type || "address",
+        poiType: props.poi_category?.[0] || props.maki || null,
+        provider: "mapbox"
+      };
+    }
+
+    function applyPaxPickupLocationResult(result) {
+      const lat = Number(result?.lat);
+      const lng = Number(result?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setPickupLocationMessage("Position konnte nicht gelesen werden.");
+        return false;
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        setPickupLocationMessage("Position liegt außerhalb des gültigen Bereichs.");
+        return false;
+      }
+      exitPaxTargetMode();
+      beginPaxMarkerMode();
+      setPaxPendingMarkerPos(lng, lat);
+      paxPickupEditOpen = true;
+      focusPaxPickupOnMap(lng, lat);
+      showHint("Treffpunkt fixieren, wenn die Position passt.");
+      updatePaxUI();
+      return true;
+    }
+
+    async function fetchPickupLocationSuggestions(query) {
+      const token = CONFIG?.mapboxToken;
+      if (!token || !String(token).startsWith("pk.")) throw new Error("Kein Mapbox-Token verfügbar.");
+      const params = new URLSearchParams({
+        q: query,
+        access_token: token,
+        session_token: getPickupLocationSessionToken(),
+        limit: String(PAX_LOCATION_SUGGEST_LIMIT),
+        language: "de",
+        country: "de",
+        proximity: getPickupLocationProximity()
+      });
+      paxPickupLocationAbort?.abort();
+      paxPickupLocationAbort = new AbortController();
+      const url = `https://api.mapbox.com/search/searchbox/v1/suggest?${params.toString()}`;
+      const res = await fetch(url, { signal: paxPickupLocationAbort.signal });
+      if (!res.ok) throw new Error("Adresssuche nicht erreichbar.");
+      const data = await res.json();
+      return Array.isArray(data?.suggestions) ? data.suggestions : [];
+    }
+
+    async function selectPickupLocationSuggestion(suggestion) {
+      const mapboxId = suggestion?.mapbox_id;
+      if (!mapboxId) return setPickupLocationMessage("Vorschlag konnte nicht gelesen werden.");
+      const input = document.getElementById("paxPickupLocationInput");
+      if (input) {
+        input.value = getSuggestionLabel(suggestion);
+        input.blur();
+      }
+      clearPickupLocationResults();
+      setPickupLocationMessage("Position wird übernommen...");
+      try {
+        const params = new URLSearchParams({
+          access_token: CONFIG.mapboxToken,
+          session_token: getPickupLocationSessionToken()
+        });
+        const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${params.toString()}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Adresse konnte nicht geladen werden.");
+        const data = await res.json();
+        const feature = Array.isArray(data?.features) ? data.features[0] : null;
+        const location = normalizePickupLocationResult(feature, suggestion);
+        if (!location) throw new Error("Adresse hat keine gültige Position.");
+        if (applyPaxPickupLocationResult(location)) {
+          setPickupLocationMessage(location.address || location.label || "Position vorgeschlagen.");
+          resetPickupLocationSession();
+        }
+      } catch (err) {
+        setPickupLocationMessage(err?.message || "Adresse konnte nicht geladen werden.");
+      }
+    }
+
+    function initPaxPickupLocationSearch() {
+      const input = document.getElementById("paxPickupLocationInput");
+      if (!input) return;
+      input.addEventListener("input", () => {
+        const query = input.value.trim();
+        clearTimeout(paxPickupLocationTimer);
+        if (query.length < 3) {
+          paxPickupLocationAbort?.abort();
+          clearPickupLocationResults();
+          setPickupLocationMessage(query ? "Bitte mindestens 3 Zeichen eingeben." : "");
+          return;
+        }
+        setPickupLocationMessage("Adresse wird gesucht...");
+        paxPickupLocationTimer = setTimeout(async () => {
+          try {
+            const suggestions = await fetchPickupLocationSuggestions(query);
+            if (input.value.trim() !== query) return;
+            renderPickupLocationResults(suggestions);
+            setPickupLocationMessage(suggestions.length ? "" : "Keine passende Adresse gefunden.");
+          } catch (err) {
+            if (err?.name === "AbortError") return;
+            clearPickupLocationResults();
+            setPickupLocationMessage(err?.message || "Adresssuche braucht Internet.");
+          }
+        }, 260);
+      });
+      input.addEventListener("search", () => {
+        if (!input.value.trim()) {
+          paxPickupLocationAbort?.abort();
+          clearPickupLocationResults();
+          setPickupLocationMessage("");
+          resetPickupLocationSession();
+        }
+      });
+      input.addEventListener("blur", () => {
+        window.setTimeout(() => {
+          if (!document.activeElement?.closest?.("#paxPickupLocationSearch")) {
+            clearPickupLocationResults();
+          }
+        }, 160);
+      });
+    }
+
+    function hasValidPaxPickup() {
+      return paxLat !== null && paxLng !== null;
+    }
+
+    function hasValidPaxTarget() {
+      return paxTargetLat !== null && paxTargetLng !== null;
+    }
+
+    function isPaxSearchReady() {
+      return hasValidPaxPickup() && hasValidPaxTarget() && isPaxDesiredTimeUsable();
+    }
+
+    function getPaxTargetUiState() {
+      const hasTarget = hasValidPaxTarget();
+      const hasPendingTarget = hasPendingPaxTarget();
+
+      if (paxTargetMode) {
+        return {
+          headerText: hasPendingTarget ? "Ziel fixieren" : "Ziel auf Karte wählen",
+          headerClassName: "pax-acc-value",
+          bodyText: "Ziel auf Karte wählen",
+          bodyClassName: "pax-status",
+          buttonText: hasPendingTarget ? "Ziel fixieren" : "Ziel auf Karte wählen"
+        };
+      }
+
+      return {
+        headerText: hasTarget ? "Ziel aktiv" : "Ziel wählen",
+        headerClassName: hasTarget ? "pax-acc-value set" : "pax-acc-value",
+        bodyText: "",
+        bodyClassName: hasTarget ? "pax-status set" : "pax-status",
+        buttonText: hasTarget ? "Ziel aktiv" : "Ziel wählen"
+      };
+    }
+
+    function getPaxPickupUiState() {
+      const hasPickup = hasValidPaxPickup();
+      const hasPendingPickup = hasPendingPaxPickup();
+      const confirmedGps = hasPickup && paxPickupSource === "gps";
+      const confirmedMap = hasPickup && paxPickupSource === "map";
+      const isGps = confirmedGps && !paxMarkerMode;
+      const isMap = confirmedMap && !paxMarkerMode;
+      const activeText = confirmedGps ? "GPS-Standort aktiv" : "Treffpunkt aktiv";
+
+      if (paxMarkerMode) {
+        return {
+          hasPickup,
+          headerText: hasPendingPickup ? "Treffpunkt fixieren" : "Treffpunkt auf Karte wählen",
+          headerClassName: "pax-acc-value",
+          bodyText: "Treffpunkt auf Karte wählen",
+          bodyClassName: "pax-status",
+          gpsActive: confirmedGps,
+          gpsSubText: confirmedGps ? "GPS-Standort aktiv" : "GPS-Standort nicht aktiv",
+          mapActive: false,
+          mapMainText: hasPendingPickup ? "Treffpunkt fixieren" : "Treffpunkt wählen",
+          mapSubText: hasPendingPickup ? "Position übernehmen" : "Auf Karte antippen"
+        };
+      }
+
+      return {
+        hasPickup,
+        headerText: hasPickup ? activeText : "",
+        headerClassName: hasPickup ? "pax-acc-value set" : "pax-acc-value",
+        bodyText: confirmedMap ? "" : (hasPickup ? activeText : ""),
+        bodyClassName: hasPickup ? "pax-status set" : "pax-status",
+        gpsActive: isGps,
+        gpsSubText: isGps ? "GPS-Standort aktiv" : "GPS-Standort nicht aktiv",
+        mapActive: isMap,
+        mapMainText: isMap ? "Treffpunkt aktiv" : "Treffpunkt wählen",
+        mapSubText: isMap ? "" : "Treffpunkt nicht aktiv"
+      };
     }
 
     function updatePaxUI() {
@@ -1179,130 +1916,143 @@
       const cancelBtn   = document.getElementById("btnPaxCancel");
       if (!statusEl) return;
 
-      const hasMarker = paxLat !== null && paxLng !== null;
-      const hasTime   = true; // Stepper startet bei 0 (jetzt), immer gesetzt
+      const onCooldown = isPaxInputLocked();
+      // Modi beenden sobald Suche aktiv oder Cooldown, bevor Texte/Klassen berechnet werden
+      if (paxSearchActive || onCooldown) {
+        exitPaxMarkerMode();
+        exitPaxTargetMode();
+        paxPickupEditOpen = false;
+      }
 
-      if (hasMarker) {
-        statusEl.textContent = `Treffpunkt gesetzt ✅  (${paxLat.toFixed(5)}, ${paxLng.toFixed(5)})`;
-        statusEl.className = "pax-status set";
-        timeBlock.style.display = "";
+      const hasMarker = hasValidPaxPickup();
+      const hasTime   = true; // Startzeit ist mit Default "jetzt" immer gesetzt
+      const pickupUi = getPaxPickupUiState();
+      const targetUi = getPaxTargetUiState();
+      const pickupEditPending = paxMarkerMode || hasPendingPaxPickup();
+      const targetEditPending = paxTargetMode || hasPendingPaxTarget();
+
+      if (hasMarker || paxMarkerMode) {
+        statusEl.textContent = pickupUi.bodyText;
+        statusEl.className = pickupUi.bodyText ? pickupUi.bodyClassName : "pax-status";
+        timeBlock.style.display = hasMarker ? "" : "none";
       } else {
-        statusEl.textContent = "Kein Treffpunkt gesetzt";
+        statusEl.textContent = "";
         statusEl.className = "pax-status";
         timeBlock.style.display = "none";
         if (searchBlock) searchBlock.style.display = "none";
-        hintEl.textContent = "Treffpunkt setzen um passende Fahrer zu sehen.";
+        hintEl.textContent = "Abholpunkt setzen um Fahrer zu finden.";
       }
 
-      // onCooldown früh deklarieren – wird von mehreren Blöcken unten gebraucht
-      const onCooldown = isPaxInputLocked();
+      const hasTarget = hasValidPaxTarget();
 
-      const hasTarget = paxTargetLat !== null && paxTargetLng !== null;
-
-      // Zielblock: sichtbar sobald Treffpunkt gesetzt
+      // Zielblock: sichtbar sobald Abholpunkt gesetzt
       if (targetBlock) targetBlock.style.display = hasMarker ? "" : "none";
 
       // Zielstatus
       if (targetStatus) {
-        if (hasTarget) {
-          targetStatus.textContent = `Ziel gesetzt ✅  (${paxTargetLat.toFixed(5)}, ${paxTargetLng.toFixed(5)})`;
-          targetStatus.className = "pax-status set";
-        } else {
-          targetStatus.textContent = "Kein Ziel gesetzt";
-          targetStatus.className = "pax-status";
-        }
+        targetStatus.textContent = targetUi.bodyText;
+        targetStatus.className = targetUi.bodyText ? targetUi.bodyClassName : "pax-status";
       }
 
       // Ziel-Button: gesperrt bei aktiver Suche oder Cooldown
       if (btnTarget) {
         btnTarget.disabled = paxSearchActive || onCooldown;
         btnTarget.classList.toggle("active-pax", paxTargetMode);
+        btnTarget.classList.toggle("target-active", hasTarget && !targetEditPending);
+        btnTarget.textContent = targetUi.buttonText;
       }
 
-      // Suchblock: nur wenn Treffpunkt + Ziel gesetzt
+      // Suchblock: nur wenn Abholpunkt + Ziel gesetzt
       if (searchBlock) {
         searchBlock.style.display = (hasMarker && hasTarget) ? "" : "none";
       }
 
       // Hint-Text je nach Status
       if (!hasMarker) {
-        hintEl.textContent = "Treffpunkt setzen um die Suche vorzubereiten.";
+        hintEl.textContent = "Bitte zuerst Abholpunkt wählen.";
+      } else if (pickupEditPending) {
+        hintEl.textContent = "Treffpunkt fixieren, wenn die Position passt.";
+      } else if (targetEditPending) {
+        hintEl.textContent = "Ziel fixieren, wenn die Position passt.";
       } else if (hasMarker && !hasTarget) {
-        hintEl.textContent = "Ziel auf der Karte setzen.";
-      } else if (hasMarker && hasTarget && !paxHasGps && !paxSearchActive) {
-        hintEl.textContent = "Bitte zuerst GPS-Standort bestätigen um die Suche zu starten.";
-      } else if (hasMarker && hasTarget && paxHasGps && !paxSearchActive) {
-        hintEl.textContent = "Suche starten wenn du bereit bist.";
+        hintEl.textContent = "Bitte zuerst Ziel wählen.";
+      } else if (hasMarker && hasTarget && !isPaxDesiredTimeUsable() && !paxSearchActive) {
+        hintEl.textContent = "Bitte gültige Startzeit eingeben.";
+      } else if (isPaxSearchReady() && !paxSearchActive) {
+        hintEl.textContent = "Fahrer finden, wenn alles passt.";
       } else if (paxSearchActive) {
         hintEl.textContent = "Suche aktiv – passende Fahrer sind hervorgehoben.";
       }
 
-      // Stepper synchronisieren
-      syncStepperUI();
+      // Zeitfeld synchronisieren
+      syncPaxTimeInputUI();
       lockedHint.classList.toggle("show", paxSearchActive);
 
       // GPS + Marker-Buttons während Cooldown sperren
       const btnGps    = document.getElementById("btnPaxGps");
       const btnMarker = document.getElementById("btnPaxMarker");
-      if (btnGps)    btnGps.disabled    = paxSearchActive || onCooldown;
-      if (btnMarker) btnMarker.disabled = paxSearchActive || onCooldown;
+      const pickupLocationInput = document.getElementById("paxPickupLocationInput");
+      if (pickupLocationInput) pickupLocationInput.disabled = paxSearchActive || onCooldown;
+      if (btnGps) {
+        const btnGpsSub = btnGps.querySelector(".pax-btn-sub");
+        btnGps.disabled = paxSearchActive || onCooldown;
+        btnGps.classList.toggle("active-pax", pickupUi.gpsActive);
+        if (btnGpsSub) btnGpsSub.textContent = pickupUi.gpsSubText;
+      }
+      if (btnMarker) {
+        const btnMarkerMain = btnMarker.querySelector(".pax-btn-main");
+        const btnMarkerSub = btnMarker.querySelector(".pax-btn-sub");
+        btnMarker.disabled = paxSearchActive || onCooldown;
+        btnMarker.classList.toggle("active-pax", pickupUi.mapActive);
+        if (btnMarkerMain) btnMarkerMain.textContent = pickupUi.mapMainText;
+        if (btnMarkerSub) btnMarkerSub.textContent = pickupUi.mapSubText;
+      }
 
-      // Such-Button: gesperrt wenn aktive Suche, Cooldown, kein Ziel, oder kein GPS
-      const hasTargetForBtn = paxTargetLat !== null && paxTargetLng !== null;
-      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || !hasTargetForBtn || !paxHasGps;
+      // Such-Button folgt der Produktregel: Abholpunkt + Ziel + gueltige Startzeit
+      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || pickupEditPending || targetEditPending || !isPaxSearchReady();
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
 
       // Draggability beider Marker synchron halten
       syncPaxMarkerDraggable();
       syncPaxTargetMarkerDraggable();
 
-      // Modi beenden sobald Suche aktiv oder Cooldown
-      if (paxSearchActive || onCooldown) {
-        exitPaxMarkerMode();
-        exitPaxTargetMode();
-      }
-
       // ── Editable-Accordion: Header-Werte + Body-Sichtbarkeit ──
       // Regel: Body offen wenn gerade aktiver Schritt; geschlossen wenn fertig.
-      // Header IMMER klickbar (außer Suche aktiv) → öffnet Body + aktiviert Modus.
+      // Header IMMER klickbar (außer Suche aktiv) → öffnet/schließt Body ohne Markerfreigabe.
 
       const locked = paxSearchActive || onCooldown;
 
-      // --- Block 1: Treffpunkt ---
+      // --- Block 1: Abholpunkt ---
       const b1val  = document.getElementById("paxAccVal1");
+      const b1label = document.getElementById("paxAccLabel1");
       const b1body = document.getElementById("paxAccBody1");
       const b1hdr  = document.getElementById("paxAccHeader1");
+      if (b1label) b1label.textContent = hasMarker ? "Abholpunkt" : "Wo möchtest du abgeholt werden?";
+      if (b1hdr) b1hdr.classList.toggle("pickup-empty", !hasMarker);
       if (b1val) {
-        if (hasMarker) {
-          b1val.textContent = "gesetzt ✅";
-          b1val.className = "pax-acc-value set";
-        } else {
-          b1val.textContent = "nicht gesetzt";
-          b1val.className = "pax-acc-value";
-        }
+        b1val.textContent = pickupUi.headerText;
+        b1val.className = pickupUi.headerClassName;
       }
       if (b1body) {
-        // Offen wenn: kein Marker gesetzt ODER Marker-Bearbeitungs-Modus aktiv
-        const b1open = !hasMarker || paxMarkerMode;
+        // Offen wenn: kein Marker gesetzt, Bearbeitung bewusst geöffnet, oder Verschiebemodus aktiv
+        const b1open = !hasMarker || paxPickupEditOpen || paxMarkerMode;
         b1body.classList.toggle("pax-closed", !b1open);
       }
       if (b1hdr) b1hdr.classList.toggle("locked", locked);
 
-      // --- Block 2: Startzeit ---
+      // --- Block 2: Startzeitfenster ---
       const b2block = document.getElementById("paxAccBlock2");
       const b2val   = document.getElementById("paxAccVal2");
       const b2body  = document.getElementById("paxTimeBlock");
       const b2hdr   = document.getElementById("paxAccHeader2");
       if (b2block) b2block.style.display = hasMarker ? "" : "none";
       if (b2val) {
-        const timeLabel = paxTimeMin === 0 ? "jetzt" : formatStepDisplay(paxTimeMin);
-        b2val.textContent = timeLabel;
+        b2val.textContent = getPaxVisibleTime();
         b2val.className = "pax-acc-value set";
       }
       if (b2body) {
-        // Offen wenn: (Zeit ist nächster Schritt = Marker da, Ziel fehlt)
-        // ODER manuell geöffnet (paxTimeOpen)
-        const b2open = hasMarker && (!hasTarget || paxTimeOpen);
+        // Offen wenn: Abholpunkt und Ziel gesetzt sind, oder manuell geöffnet.
+        const b2open = hasMarker && ((hasTarget && !paxTimeTouched) || paxTimeOpen);
         b2body.classList.toggle("pax-closed", !b2open);
       }
       if (b2hdr) b2hdr.classList.toggle("locked", locked);
@@ -1314,17 +2064,12 @@
       const b3hdr   = document.getElementById("paxAccHeader3");
       if (b3block) b3block.style.display = hasMarker ? "" : "none";
       if (b3val) {
-        if (hasTarget) {
-          b3val.textContent = "gesetzt ✅";
-          b3val.className = "pax-acc-value set";
-        } else {
-          b3val.textContent = "nicht gesetzt";
-          b3val.className = "pax-acc-value";
-        }
+        b3val.textContent = targetUi.headerText;
+        b3val.className = targetUi.headerClassName;
       }
       if (b3body) {
-        // Offen wenn: Marker gesetzt, Ziel noch nicht gesetzt, ODER Ziel-Modus aktiv
-        const b3open = hasMarker && (!hasTarget || paxTargetMode);
+        // Offen wenn: kein Ziel gesetzt, Ziel-Modus aktiv, oder Nutzer den Zielbereich offen haelt.
+        const b3open = hasMarker && (!hasTarget || paxTargetMode || paxTargetOpen);
         b3body.classList.toggle("pax-closed", !b3open);
       }
       if (b3hdr) b3hdr.classList.toggle("locked", locked);
@@ -1338,27 +2083,31 @@
 
     // ── Accordion-Header-Klick-Handler (einmal beim Start registrieren) ──
     function initAccordionHandlers() {
-      // Header 1: Treffpunkt → Marker-Modus aktivieren
+      // Header 1: Abholpunkt-Bearbeitung oeffnen/schliessen, ohne Marker freizugeben
       document.getElementById("paxAccHeader1")?.addEventListener("click", () => {
         if (paxSearchActive || Date.now() < paxCooldownUntil) return;
-        // Body aufklappen durch Marker-Modus einschalten
-        if (!paxMarkerMode) {
-          exitPaxTargetMode();
-          paxMarkerMode = true;
-          const btn = document.getElementById("btnPaxMarker");
-          if (btn) btn.classList.add("active-pax");
-          showHint("Treffpunkt auf der Karte setzen oder verschieben.");
-        } else {
-          // Nochmal klicken → Modus beenden, Body bleibt wenn Marker fehlt
+        exitPaxTargetMode();
+        if (paxMarkerMode) {
           exitPaxMarkerMode();
+          paxPickupEditOpen = true;
+          hideHint();
+          updatePaxUI();
+          return;
+        }
+        if (!hasValidPaxPickup()) return;
+        paxPickupEditOpen = !paxPickupEditOpen;
+        if (paxPickupEditOpen) {
+          showHint("Abholpunkt-Bearbeitung geöffnet.");
+        } else {
           hideHint();
         }
         updatePaxUI();
       });
 
-      // Header 2: Startzeit → paxTimeOpen togglen, aktueller Wert bleibt erhalten
+      // Header 2: Startzeitfenster → paxTimeOpen togglen, aktueller Wert bleibt erhalten
       document.getElementById("paxAccHeader2")?.addEventListener("click", () => {
         if (paxSearchActive || Date.now() < paxCooldownUntil) return;
+        paxTimeTouched = true;
         paxTimeOpen = !paxTimeOpen;
         updatePaxUI();
       });
@@ -1367,11 +2116,20 @@
       document.getElementById("paxAccHeader3")?.addEventListener("click", () => {
         if (paxSearchActive || Date.now() < paxCooldownUntil) return;
         if (!paxTargetMode) {
-          exitPaxMarkerMode();
-          paxTargetMode = true;
-          const btn = document.getElementById("btnPaxTarget");
-          if (btn) btn.classList.add("active-pax");
-          showHint("Ziel auf der Karte antippen.");
+          if (hasValidPaxTarget()) {
+            paxTargetOpen = !paxTargetOpen;
+            hideHint();
+          } else {
+            exitPaxMarkerMode();
+            beginPaxTargetMode();
+            paxTargetOpen = true;
+            const btn = document.getElementById("btnPaxTarget");
+            if (btn) btn.classList.add("active-pax");
+            showHint("Ziel auf der Karte wählen.");
+          }
+        } else if (hasPendingPaxTarget()) {
+          confirmPaxPendingTarget();
+          return;
         } else {
           exitPaxTargetMode();
           hideHint();
@@ -1386,13 +2144,15 @@
     // GPS-Standort → Marker setzen (aktiviert keinen Verschiebe-Modus)
     document.getElementById("btnPaxGps")?.addEventListener("click", () => {
       if (!navigator.geolocation) return showHint("GPS nicht verfügbar.");
+      const keepPickupEditOpen = !hasValidPaxPickup() || paxPickupEditOpen || paxMarkerMode;
       navigator.geolocation.getCurrentPosition(
         pos => {
           const { longitude: lng, latitude: lat } = pos.coords;
           paxHasGps = true;                    // GPS-Verifikation gesetzt
           exitPaxMarkerMode();               // Marker-Modus beenden (GPS = kein manueller Modus)
+          paxPickupEditOpen = keepPickupEditOpen;
           setPaxMarkerPos(lng, lat, true);   // fromGps=true → paxHasGps bleibt true
-          map.easeTo({ center: [lng, lat], zoom: 15, duration: 600 });
+          focusPaxPickupOnMap(lng, lat);
           updatePaxUI();              // Such-Button entsperren
         },
         err => showHint("GPS-Fehler: " + err.message)
@@ -1402,112 +2162,123 @@
     // Marker per Kartenklick setzen
     document.getElementById("btnPaxMarker")?.addEventListener("click", () => {
       if (paxMarkerMode) {
-        // Modus beenden
-        paxMarkerMode = false;
-        document.getElementById("btnPaxMarker").classList.remove("active-pax");
-        showHint("");
-        updatePaxUI();
+        confirmPaxPendingPickup();
         return;
       }
       // Marker-Modus aktivieren – Ziel-Modus beenden falls aktiv
       exitPaxTargetMode();
-      paxMarkerMode = true;
-      document.getElementById("btnPaxMarker").classList.add("active-pax");
-      showHint("Auf Karte tippen um Treffpunkt zu setzen.");
+      beginPaxMarkerMode();
+      showHint("Treffpunkt auf der Karte wählen.");
       updatePaxUI(); // Draggability sofort aktivieren
     });
 
     // ─────────────────────────────────────────────────
-    // ZEITFENSTER-STEPPER
+    // ZEITFENSTER: GPS-artiges HH:MM-Feld, intern bleibt paxTimeMin
     // ─────────────────────────────────────────────────
     const PAX_STEP_MIN  = 0;    // frühester Wert: jetzt
     const PAX_STEP_MAX  = 180;  // spätester Wert: 3 Std
+    const PAX_TIME_PLACEHOLDER = "HH:MM";
 
-    function formatStepDisplay(min) {
-      if (min === null) return "–";
-      if (min === 0)   return "jetzt";
-      if (min < 60)    return `${min} Min`;
-      const h = Math.floor(min / 60);
-      const m = min % 60;
-      return m === 0 ? `${h} Std` : `${h} Std ${m}`;
+    function padTimePart(value) {
+      return String(value).padStart(2, "0");
     }
 
-    function getStepSize(holdMs) {
-      if (holdMs < 1000) return 5;
-      if (holdMs < 2000) return 10;
-      return 15;
+    function formatTimeOfDay(date) {
+      return `${padTimePart(date.getHours())}:${padTimePart(date.getMinutes())}`;
     }
 
-    function applyStep(delta) {
-      const current = paxTimeMin ?? 0;
-      const next = Math.max(PAX_STEP_MIN, Math.min(PAX_STEP_MAX, current + delta));
-      if (next === paxTimeMin) return;
-      paxTimeMin = next;
+    function formatPaxTimeFromMinutes(min, now = new Date()) {
+      const safeMin = Math.max(PAX_STEP_MIN, Math.min(PAX_STEP_MAX, Number(min) || 0));
+      return formatTimeOfDay(new Date(now.getTime() + safeMin * 60_000));
+    }
+
+    function getPaxVisibleTime() {
+      return paxTimeUserSet && paxDesiredTime ? paxDesiredTime : PAX_TIME_PLACEHOLDER;
+    }
+
+    function getMinutesUntilClockTime(value, now = new Date()) {
+      const match = value.match(/^(\d{2}):(\d{2})$/);
+      if (!match) return null;
+      const h = Number(match[1]);
+      const m = Number(match[2]);
+      if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+
+      const base = new Date(now);
+      base.setSeconds(0, 0);
+      const target = new Date(base);
+      target.setHours(h, m, 0, 0);
+      let diffMin = Math.round((target.getTime() - base.getTime()) / 60_000);
+      if (diffMin < 0) diffMin += 24 * 60;
+      return diffMin;
+    }
+
+    function isPaxDesiredTimeUsable() {
+      if (!paxTimeUserSet) return true;
+      const min = getMinutesUntilClockTime(paxDesiredTime || "");
+      return min !== null && min >= PAX_STEP_MIN && min <= PAX_STEP_MAX;
+    }
+
+    function syncPaxTimeInputUI() {
+      const input = document.getElementById("paxTimeInput");
+      if (!input) return;
+      input.disabled = paxSearchActive || isPaxInputLocked();
+      if (document.activeElement !== input) {
+        input.value = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : "";
+      }
+    }
+
+    function commitPaxTimeInput(showMessage = true) {
+      const input = document.getElementById("paxTimeInput");
+      if (!paxTimeUserSet) {
+        paxTimeMin = 0;
+        if (input) input.value = "";
+        return true;
+      }
+      const rawValue = (input?.value || paxDesiredTime || "").trim();
+      const nextMin = getMinutesUntilClockTime(rawValue);
+      if (nextMin === null) {
+        if (!paxDesiredTime) paxTimeUserSet = false;
+        if (input) input.value = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : "";
+        updatePaxUI();
+        if (showMessage) showHint("Bitte Uhrzeit als HH:MM eingeben.");
+        return false;
+      }
+      if (nextMin < PAX_STEP_MIN || nextMin > PAX_STEP_MAX) {
+        paxDesiredTime = rawValue;
+        paxTimeUserSet = true;
+        updatePaxUI();
+        if (showMessage) showHint("Bitte eine Startzeit innerhalb der nächsten 3 Stunden wählen.");
+        return false;
+      }
+      paxDesiredTime = rawValue;
+      paxTimeUserSet = true;
+      paxTimeMin = nextMin;
+      if (input) input.value = paxDesiredTime;
       updatePaxUI();
+      return true;
     }
 
-    function syncStepperUI() {
-      const display  = document.getElementById("paxStepDisplay");
-      const btnMinus = document.getElementById("btnStepMinus");
-      const btnPlus  = document.getElementById("btnStepPlus");
-      const locked   = paxSearchActive || isPaxInputLocked();
-      if (display)  display.textContent = formatStepDisplay(paxTimeMin);
-      if (btnMinus) btnMinus.disabled = locked || paxTimeMin === PAX_STEP_MIN;
-      if (btnPlus)  btnPlus.disabled  = locked || paxTimeMin === PAX_STEP_MAX;
-    }
+    const paxTimeInput = document.getElementById("paxTimeInput");
+    if (paxTimeInput) {
+      paxTimeInput.addEventListener("input", e => {
+        const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+        if (digits.length <= 2) e.target.value = digits;
+        else e.target.value = `${digits.slice(0, 2)}:${digits.slice(2)}`;
 
-    // Hold-to-accelerate Logik
-    function makeStepperHold(sign) {
-      let holdTimer  = null;
-      let holdStart  = 0;
-      let intervalId = null;
-
-      function stop() {
-        if (intervalId) { clearInterval(intervalId); intervalId = null; }
-        if (holdTimer)  { clearTimeout(holdTimer);   holdTimer  = null; }
-      }
-
-      function tick() {
-        const holdMs = Date.now() - holdStart;
-        applyStep(sign * getStepSize(holdMs));
-      }
-
-      function start(e) {
-        e.preventDefault();
-        if (paxSearchActive || isPaxInputLocked()) return;
-        holdStart = Date.now();
-        // Sofortiger erster Schritt
-        applyStep(sign * 5);
-        // Nach 400ms beginnt kontinuierlicher Tick
-        holdTimer = setTimeout(() => {
-          intervalId = setInterval(tick, 180);
-        }, 400);
-      }
-
-      return { start, stop };
-    }
-
-    const stepMinus = makeStepperHold(-1);
-    const stepPlus  = makeStepperHold(+1);
-
-    const btnStepMinus = document.getElementById("btnStepMinus");
-    const btnStepPlus  = document.getElementById("btnStepPlus");
-
-    if (btnStepMinus) {
-      btnStepMinus.addEventListener("mousedown",   stepMinus.start);
-      btnStepMinus.addEventListener("touchstart",  stepMinus.start, { passive: false });
-      btnStepMinus.addEventListener("mouseup",     stepMinus.stop);
-      btnStepMinus.addEventListener("mouseleave",  stepMinus.stop);
-      btnStepMinus.addEventListener("touchend",    stepMinus.stop);
-      btnStepMinus.addEventListener("touchcancel", stepMinus.stop);
-    }
-    if (btnStepPlus) {
-      btnStepPlus.addEventListener("mousedown",   stepPlus.start);
-      btnStepPlus.addEventListener("touchstart",  stepPlus.start, { passive: false });
-      btnStepPlus.addEventListener("mouseup",     stepPlus.stop);
-      btnStepPlus.addEventListener("mouseleave",  stepPlus.stop);
-      btnStepPlus.addEventListener("touchend",    stepPlus.stop);
-      btnStepPlus.addEventListener("touchcancel", stepPlus.stop);
+        if (/^\d{2}:\d{2}$/.test(e.target.value)) {
+          paxTimeUserSet = true;
+          commitPaxTimeInput(true);
+        }
+      });
+      paxTimeInput.addEventListener("blur", () => {
+        if (!/^\d{2}:\d{2}$/.test(paxTimeInput.value)) {
+          paxTimeInput.value = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : "";
+          updatePaxUI();
+          return;
+        }
+        paxTimeUserSet = true;
+        commitPaxTimeInput(true);
+      });
     }
 
     // ─────────────────────────────────────────────────
@@ -1582,6 +2353,7 @@
       if (!map || paxLat === null || paxLng === null) return;
       if (paxTargetLat === null || paxTargetLng === null) return;
       if (isPaxInputLocked()) return;
+      if (!commitPaxTimeInput(true)) return;
 
       if (isPaxRateLimited()) {
         const statusEl = document.getElementById("paxMatchStatus");
@@ -1666,6 +2438,7 @@
     function cancelPaxSearch() {
       paxSearchActive = false;
       paxTimeOpen = false;
+      paxTimeTouched = false;
       paxMatchedKeys.clear();
       clearManualOpen();
       refreshPaxMatchLayer();
@@ -3028,21 +3801,20 @@
         if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
         // Mitfahrer: Modi sind gegenseitig ausschließend (else if)
         if (paxMarkerMode) {
-          // Treffpunkt per Kartenklick setzen
+          // Treffpunkt per Kartenklick nur vorpositionieren; bestaetigt wird per Button
           if (!isPaxInputLocked()) {
-            setPaxMarkerPos(e.lngLat.lng, e.lngLat.lat);
-            paxMarkerMode = false;
-            document.getElementById("btnPaxMarker")?.classList.remove("active-pax");
-            showHint("");
+            setPaxPendingMarkerPos(e.lngLat.lng, e.lngLat.lat);
+            paxPickupEditOpen = true;
+            showHint("Treffpunkt fixieren, wenn die Position passt.");
+            updatePaxUI();
           }
           // Bei Cooldown: Modus bleibt aktiv, Klick wird ignoriert
         } else if (paxTargetMode) {
-          // Zielmarker per Kartenklick setzen
+          // Ziel per Kartenklick nur vorpositionieren; bestaetigt wird per Button
           if (!isPaxInputLocked() && !paxSearchActive) {
-            setPaxTargetPos(e.lngLat.lng, e.lngLat.lat);
-            paxTargetMode = false;
-            document.getElementById("btnPaxTarget")?.classList.remove("active-pax");
-            showHint("");
+            setPaxPendingTargetPos(e.lngLat.lng, e.lngLat.lat);
+            showHint("Ziel fixieren, wenn die Position passt.");
+            updatePaxUI();
           }
         }
       });
@@ -3060,9 +3832,14 @@
         const status = document.getElementById("panelStatusText");
         if (status) status.textContent = text || "";
       }
+      function setPanelIdleTitle() {
+        const status = document.getElementById("panelStatusText");
+        if (!status) return;
+        status.textContent = "EcoRide";
+      }
       function updatePanelSearchStatus() {
         if (!paxSearchActive) {
-          setPanelStatusText("EcoRide – Mitfahrer");
+          setPanelIdleTitle();
         } else if (paxMatchedKeys.size > 0) {
           setPanelStatusText("Fahrer gefunden");
         } else {
@@ -3352,6 +4129,7 @@
     document.addEventListener("DOMContentLoaded", initMap);
     document.addEventListener("DOMContentLoaded", () => {
       initAccordionHandlers();
+      initPaxPickupLocationSearch();
       applyTheme(currentTheme, false);
       document.getElementById("themeToggle")?.addEventListener("click", (e) => {
         e.stopPropagation();
