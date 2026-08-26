@@ -204,7 +204,8 @@
       background: rgba(17,24,37,0.46);
       overflow: hidden;
     }
-    .pax-flow-title + .pax-acc-block { margin-top: 4px; }
+    .pax-flow-title + .pax-acc-block { margin-top: 6px; }
+    .pax-acc-block + .pax-acc-block { margin-top: 14px; }
     body.theme-light .pax-acc-block {
       background: rgba(255,255,255,0.82);
       border-color: rgba(15,23,42,0.10);
@@ -237,6 +238,26 @@
       color: var(--ink);
       min-width: 0;
     }
+    #paxAccLabel1,
+    #paxAccBlock3 .pax-acc-label,
+    #paxAccBlock2 .pax-acc-label {
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    #paxAccHeader1,
+    #paxAccHeader3,
+    #paxAccHeader2 {
+      padding-bottom: 3px;
+      row-gap: 2px;
+    }
+    #paxAccHeader1 .pax-acc-edit,
+    #paxAccHeader3 .pax-acc-edit,
+    #paxAccHeader2 .pax-acc-edit {
+      grid-row: 1;
+      align-self: center;
+    }
     .pax-acc-value {
       grid-column: 1;
       font-size: 12px;
@@ -246,6 +267,13 @@
       text-overflow: ellipsis;
     }
     .pax-acc-value.set { color: #4ade80; }
+    #paxAccHeader1 .pax-acc-value.set,
+    #paxAccHeader3 .pax-acc-value.set,
+    #paxAccHeader2 .pax-acc-value.set {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
     .pax-acc-edit {
       grid-column: 2;
       grid-row: 1 / span 2;
@@ -258,7 +286,8 @@
       transition: color .15s;
     }
     .pax-acc-header:not(.locked):hover .pax-acc-edit { color: rgba(199,223,58,0.95); }
-    .pax-map-icon svg {
+    .pax-map-icon svg,
+    .pax-time-icon svg {
       width: 18px;
       height: 18px;
       display: block;
@@ -275,16 +304,19 @@
       max-height: 300px;
       opacity: 1;
     }
+    #paxAccBlock1 .pax-acc-body:not(.pax-closed) { max-height: 340px; }
     .pax-acc-body.pax-closed {
       max-height: 0;
       opacity: 0;
       pointer-events: none;
     }
     .pax-acc-inner {
-      padding: 0 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 2px 14px 16px;
       box-sizing: border-box;
     }
-    #paxAccBlock1 .pax-acc-inner { padding: 4px 14px 16px; }
 
     /* ── Komprimierte Block-Abstände ── */
     .pax-block {
@@ -329,23 +361,81 @@
     .pax-pickup-options {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
+    }
+    .pax-acc-inner > .pax-location-search,
+    .pax-address-choice-row > .pax-location-search {
+      margin: 0;
     }
     .pax-choice-btn {
       appearance: none;
       -webkit-appearance: none;
       -webkit-tap-highlight-color: transparent;
-      min-height: 76px;
+      min-height: 60px;
       align-items: center;
       gap: 5px;
       margin-bottom: 0;
-      padding: 14px;
+      padding: 10px 18px;
       text-align: center;
       background: rgba(255,255,255,0.04);
       border-color: rgba(255,255,255,0.07);
       color: var(--ink);
       box-shadow: 0 0 0 rgba(255,255,255,0);
       outline: none;
+    }
+    #btnPaxGps,
+    #btnPaxMarker,
+    #btnPaxTarget {
+      min-height: 60px;
+      padding: 10px 18px;
+      margin-bottom: 0;
+    }
+    .pax-map-choice-row,
+    .pax-address-choice-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      align-items: stretch;
+      width: 100%;
+      min-width: 0;
+    }
+    .pax-map-choice-row.show-clear,
+    .pax-address-choice-row.show-clear {
+      grid-template-columns: minmax(0, 1fr) 44px;
+    }
+    .pax-map-clear-btn {
+      appearance: none;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 60px;
+      border-radius: 12px;
+      border: 1px solid rgba(239,68,68,0.34);
+      background: rgba(239,68,68,0.10);
+      color: #f87171;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      box-sizing: border-box;
+      outline: none;
+    }
+    .pax-map-choice-row.show-clear .pax-map-clear-btn,
+    .pax-address-choice-row.show-clear .pax-map-clear-btn {
+      display: flex;
+    }
+    .pax-map-clear-btn[hidden] {
+      display: none !important;
+    }
+    body.theme-light .pax-map-clear-btn {
+      background: rgba(239,68,68,0.08);
+      color: #b91c1c;
+      border-color: rgba(239,68,68,0.28);
     }
     .pax-choice-btn.active-pax {
       background: rgba(255,255,255,0.04);
@@ -381,8 +471,14 @@
       color: rgba(229,231,235,0.66);
     }
     .pax-btn.active-pax .pax-btn-sub { color: rgba(11,15,20,0.70); }
-    .pax-choice-btn.active-pax .pax-btn-main { color: #4ade80; }
-    .pax-choice-btn.active-pax .pax-btn-sub { color: #4ade80; }
+    .pax-choice-btn.active-pax .pax-btn-main { color: var(--ink); }
+    .pax-choice-btn.active-pax .pax-btn-sub {
+      color: #4ade80;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-top: -3px;
+    }
     .pax-choice-separator {
       align-self: center;
       margin: -4px 0;
@@ -395,52 +491,99 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-bottom: 12px;
+      margin: 14px 0;
+      width: 100%;
+      inline-size: 100%;
+      max-inline-size: none;
+      min-inline-size: 0;
+      align-self: stretch;
+      box-sizing: border-box;
+    }
+    .pax-location-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.25;
     }
     .pax-location-input {
       width: 100%;
+      inline-size: 100%;
+      max-inline-size: none;
+      min-inline-size: 0;
       box-sizing: border-box;
-      min-height: 44px;
-      border-radius: 12px;
+      min-height: 60px;
+      border-radius: 18px;
       border: 1px solid rgba(255,255,255,0.10);
-      background: rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.055);
       color: var(--ink);
-      padding: 10px 12px;
-      font-size: 15px;
+      padding: 16px 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
       line-height: 1.25;
+      letter-spacing: 0;
       outline: none;
     }
-    .pax-location-input::placeholder { color: rgba(229,231,235,0.50); }
+    .pax-location-input::placeholder {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      opacity: 1;
+    }
+    .pax-location-input:not(:placeholder-shown)::placeholder {
+      color: transparent;
+      opacity: 0;
+    }
+    .pax-location-input:focus::placeholder {
+      color: transparent;
+      opacity: 0;
+    }
+    .pax-location-input::-webkit-search-cancel-button,
+    .pax-location-input::-webkit-search-decoration {
+      -webkit-appearance: none;
+      appearance: none;
+      display: none;
+    }
     .pax-location-input:focus { border-color: rgba(199,223,58,0.42); }
     .pax-location-results {
       display: none;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
+      width: 100%;
+      inline-size: 100%;
+      max-inline-size: none;
+      min-inline-size: 0;
+      box-sizing: border-box;
     }
     .pax-location-results.show { display: flex; }
     .pax-location-result {
       appearance: none;
       -webkit-appearance: none;
       width: 100%;
-      min-height: 44px;
-      border-radius: 12px;
+      inline-size: 100%;
+      max-inline-size: none;
+      min-inline-size: 0;
+      box-sizing: border-box;
+      min-height: 58px;
+      border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.08);
       background: rgba(17,24,37,0.36);
       color: var(--ink);
-      padding: 9px 12px;
+      padding: 13px 16px;
       text-align: left;
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
     .pax-location-result-main {
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 700;
       line-height: 1.25;
     }
     .pax-location-result-sub {
-      font-size: 12px;
+      font-size: 12.5px;
       line-height: 1.25;
       color: var(--muted);
     }
@@ -450,6 +593,54 @@
       line-height: 1.35;
       color: var(--muted);
       text-align: center;
+    }
+    .pax-location-message:empty {
+      display: none;
+    }
+    .pax-location-search.location-active {
+      gap: 5px;
+      min-height: 60px;
+      justify-content: center;
+      align-items: center;
+      border-radius: 12px;
+      border: 1px solid rgba(199,223,58,0.34);
+      background: rgba(255,255,255,0.04);
+      padding: 10px 18px;
+      text-align: center;
+    }
+    .pax-location-search.location-active .pax-location-label,
+    .pax-location-search.location-active .pax-location-results {
+      display: none;
+    }
+    .pax-location-search.location-active .pax-location-input {
+      appearance: none;
+      -webkit-appearance: none;
+      display: block;
+      min-height: auto;
+      height: 1.25em;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 0;
+      margin: 0;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.25;
+      letter-spacing: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pax-location-search.location-active .pax-location-message {
+      color: #4ade80;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin: -3px 0 0;
+      min-height: auto;
     }
     body.theme-light .pax-btn {
       background: rgba(15,23,42,0.04);
@@ -485,7 +676,7 @@
       border-color: rgba(15,23,42,0.10);
       color: var(--ink);
     }
-    body.theme-light .pax-location-input::placeholder { color: rgba(17,24,39,0.48); }
+    body.theme-light .pax-location-input::placeholder { color: var(--ink); }
     body.theme-light .pax-location-result {
       background: rgba(15,23,42,0.035);
       border-color: rgba(15,23,42,0.08);
@@ -493,8 +684,18 @@
     }
     body.theme-light .pax-btn-sub { color: rgba(17,24,39,0.62); }
     body.theme-light .pax-btn.active-pax .pax-btn-sub { color: rgba(11,15,20,0.70); }
-    body.theme-light .pax-choice-btn.active-pax .pax-btn-main { color: #4ade80; }
+    body.theme-light .pax-choice-btn.active-pax .pax-btn-main { color: var(--ink); }
     body.theme-light .pax-choice-btn.active-pax .pax-btn-sub { color: #4ade80; }
+    .pax-map-choice-row .pax-choice-btn:not(.active-pax) .pax-btn-sub,
+    .pax-map-choice-row .pax-choice-btn.map-editing .pax-btn-sub,
+    body.theme-light .pax-map-choice-row .pax-choice-btn:not(.active-pax) .pax-btn-sub,
+    body.theme-light .pax-map-choice-row .pax-choice-btn.map-editing .pax-btn-sub {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.35;
+      margin-top: 0;
+    }
     /* Sekundaerer Status */
     .pax-status {
       font-size: 12px;
@@ -563,7 +764,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 8px;
       padding-top: 2px;
       text-align: center;
     }
@@ -580,7 +781,7 @@
     .pax-time-input-wrap input {
       text-align: center;
       width: 100%;
-      max-width: 220px;
+      max-width: none;
       border-radius: 10px;
       border: 1px solid rgba(199,223,58,0.18);
       background: rgba(17,24,37,0.28);
@@ -604,22 +805,7 @@
     }
 
     /* Zielbearbeitung bleibt eine normale Kartenflaeche; Gruen nur als Statussprache. */
-    #btnPaxTarget.active-pax {
-      background: rgba(17,24,37,0.28);
-      color: #e5e7eb;
-      border-color: rgba(199,223,58,0.25);
-    }
     #paxTargetStatus.set { color: #4ade80; }
-    #btnPaxTarget.target-active {
-      color: #4ade80;
-      font-weight: 700;
-    }
-    body.theme-light #btnPaxTarget.active-pax {
-      background: rgba(15,23,42,0.04);
-      color: #111827;
-      border-color: rgba(15,23,42,0.10);
-    }
-    body.theme-light #btnPaxTarget.target-active { color: #4ade80; }
 
     /* ── Mitfahrer: Such-Buttons ── */
     .pax-search-actions {
@@ -1031,7 +1217,7 @@
       <!-- Accordion Block 1: Abholpunkt – Header immer sichtbar -->
       <div class="pax-acc-block" id="paxAccBlock1">
         <div class="pax-acc-header" id="paxAccHeader1" role="button" aria-expanded="true">
-          <span class="pax-acc-label" id="paxAccLabel1">Wo möchtest du abgeholt werden?</span>
+          <span class="pax-acc-label" id="paxAccLabel1">Abholung</span>
           <span class="pax-acc-value" id="paxAccVal1"></span>
           <span class="pax-acc-edit pax-map-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
@@ -1043,29 +1229,39 @@
         </div>
         <div class="pax-acc-body" id="paxAccBody1">
           <div class="pax-acc-inner">
-            <div class="pax-location-search" id="paxPickupLocationSearch">
-              <input
-                class="pax-location-input"
-                id="paxPickupLocationInput"
-                type="search"
-                inputmode="search"
-                placeholder="Adresse oder Ort"
-                autocomplete="off"
-                enterkeyhint="search"
-              />
-              <div class="pax-location-results" id="paxPickupLocationResults"></div>
-              <div class="pax-location-message" id="paxPickupLocationMessage"></div>
-            </div>
             <div class="pax-pickup-options">
+              <div class="pax-location-label">Mein Standort</div>
               <button class="pax-btn pax-choice-btn" id="btnPaxGps">
                 <span class="pax-btn-main">GPS-Standort</span>
-                <span class="pax-btn-sub">GPS-Standort nicht aktiv</span>
+                <span class="pax-btn-sub">Aktuellen Standort verwenden</span>
               </button>
-              <div class="pax-choice-separator">oder</div>
-              <button class="pax-btn pax-choice-btn" id="btnPaxMarker">
-                <span class="pax-btn-main">Treffpunkt</span>
-                <span class="pax-btn-sub">Treffpunkt nicht aktiv</span>
-              </button>
+            </div>
+            <div class="pax-address-choice-row" id="paxPickupAddressChoiceRow">
+              <div class="pax-location-search" id="paxPickupLocationSearch">
+                <div class="pax-location-label">Adresseingabe</div>
+                <input
+                  class="pax-location-input"
+                  id="paxPickupLocationInput"
+                  type="search"
+                  inputmode="search"
+                  placeholder="Ort oder Adresse suchen"
+                  autocomplete="off"
+                  enterkeyhint="search"
+                />
+                <div class="pax-location-results" id="paxPickupLocationResults"></div>
+                <div class="pax-location-message" id="paxPickupLocationMessage"></div>
+              </div>
+              <button class="pax-map-clear-btn pax-address-clear-btn" id="btnPaxPickupAddressClear" type="button" hidden aria-label="Abholadresse aufheben" title="Abholadresse aufheben">X</button>
+            </div>
+            <div class="pax-pickup-options">
+              <div class="pax-location-label">Dein Treffpunkt</div>
+              <div class="pax-map-choice-row" id="paxPickupMapChoiceRow">
+                <button class="pax-btn pax-choice-btn" id="btnPaxMarker">
+                  <span class="pax-btn-main">Treffpunkt auf Karte wählen</span>
+                  <span class="pax-btn-sub">Position selbst auf Karte festlegen</span>
+                </button>
+                <button class="pax-map-clear-btn" id="btnPaxMarkerClear" type="button" hidden aria-label="Treffpunkt aufheben" title="Treffpunkt aufheben">X</button>
+              </div>
             </div>
             <div class="pax-status" id="paxMarkerStatus"></div>
           </div>
@@ -1075,7 +1271,7 @@
       <!-- Accordion Block 3: Ziel – sichtbar sobald Abholpunkt gesetzt -->
       <div class="pax-acc-block" id="paxAccBlock3" style="display:none">
         <div class="pax-acc-header" id="paxAccHeader3" role="button" aria-expanded="false">
-          <span class="pax-acc-label">Ziel</span>
+          <span class="pax-acc-label">Ankunft</span>
           <span class="pax-acc-value" id="paxAccVal3">nicht gesetzt</span>
           <span class="pax-acc-edit pax-map-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
@@ -1087,7 +1283,31 @@
         </div>
         <div class="pax-acc-body pax-closed" id="paxTargetBlock">
           <div class="pax-acc-inner">
-            <button class="pax-btn" id="btnPaxTarget">Ziel auf Karte setzen</button>
+            <div class="pax-address-choice-row" id="paxTargetAddressChoiceRow">
+              <div class="pax-location-search" id="paxTargetLocationSearch">
+                <div class="pax-location-label">Adresseingabe</div>
+                <input
+                  class="pax-location-input"
+                  id="paxTargetLocationInput"
+                  type="search"
+                  inputmode="search"
+                  placeholder="Ort oder Adresse suchen"
+                  autocomplete="off"
+                  enterkeyhint="search"
+                />
+                <div class="pax-location-results" id="paxTargetLocationResults"></div>
+                <div class="pax-location-message" id="paxTargetLocationMessage"></div>
+              </div>
+              <button class="pax-map-clear-btn pax-address-clear-btn" id="btnPaxTargetAddressClear" type="button" hidden aria-label="Zieladresse aufheben" title="Zieladresse aufheben">X</button>
+            </div>
+            <div class="pax-location-label">Dein Endpunkt</div>
+            <div class="pax-map-choice-row" id="paxTargetMapChoiceRow">
+              <button class="pax-btn pax-choice-btn" id="btnPaxTarget">
+                <span class="pax-btn-main">Ankunft auf Karte wählen</span>
+                <span class="pax-btn-sub">Position selbst auf Karte festlegen</span>
+              </button>
+              <button class="pax-map-clear-btn" id="btnPaxTargetClear" type="button" hidden aria-label="Ziel aufheben" title="Ziel aufheben">X</button>
+            </div>
             <div class="pax-status" id="paxTargetStatus"></div>
           </div>
         </div>
@@ -1096,13 +1316,19 @@
       <!-- Accordion Block 2: Startzeitfenster – sichtbar sobald Abholpunkt gesetzt -->
       <div class="pax-acc-block" id="paxAccBlock2" style="display:none">
         <div class="pax-acc-header" id="paxAccHeader2" role="button" aria-expanded="false">
-          <span class="pax-acc-label">Wann möchtest du losfahren?</span>
+          <span class="pax-acc-label">Startzeit</span>
           <span class="pax-acc-value" id="paxAccVal2">HH:MM</span>
+          <span class="pax-acc-edit pax-time-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 7v5l3 2"></path>
+            </svg>
+          </span>
         </div>
         <div class="pax-acc-body pax-closed" id="paxTimeBlock">
           <div class="pax-acc-inner">
             <div class="pax-time-inner">
-              <div class="pax-time-label">Wann möchtest du losfahren?</div>
+              <div class="pax-time-label">Startzeit eingeben</div>
               <div class="pax-time-input-wrap">
                 <input id="paxTimeInput" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" autocomplete="off" />
               </div>
@@ -1335,6 +1561,10 @@
     // Zielmarker State
     let paxTargetLat    = null;
     let paxTargetLng    = null;
+    let paxTargetSource = null; // "address" oder "map": Herkunft des gueltigen Ziels
+    let paxTargetAddressResult = null;
+    let paxTargetMapLat = null;
+    let paxTargetMapLng = null;
     let paxPendingTargetLat = null;
     let paxPendingTargetLng = null;
     let paxTargetMarker = null;
@@ -1365,7 +1595,10 @@
     let paxMarker      = null;  // Mapbox Marker für Treffpunkt
     let paxLat         = null;
     let paxLng         = null;
-    let paxPickupSource = null; // "gps" oder "map": Herkunft des gueltigen Abholpunkts
+    let paxPickupSource = null; // "gps", "address" oder "map": Herkunft des gueltigen Abholpunkts
+    let paxPickupLabel  = "";
+    let paxPickupMapLat = null;
+    let paxPickupMapLng = null;
     let paxPendingPickupLat = null;
     let paxPendingPickupLng = null;
     let paxTimeMin     = 0;     // gewähltes Zeitfenster in Minuten (0 = jetzt)
@@ -1443,10 +1676,15 @@
       syncPaxTargetMarkerDraggable();
     }
 
-    function setPaxTargetPos(lng, lat) {
+    function setPaxTargetPos(lng, lat, source = "map") {
       if (isPaxInputLocked() || paxSearchActive) return;
       paxTargetLng = lng;
       paxTargetLat = lat;
+      paxTargetSource = source || "map";
+      if (paxTargetSource === "map") {
+        paxTargetMapLng = lng;
+        paxTargetMapLat = lat;
+      }
       paxPendingTargetLng = null;
       paxPendingTargetLat = null;
       ensurePaxTargetMarker(lng, lat);
@@ -1504,8 +1742,9 @@
       paxTargetOpen = true;
       const btn = document.getElementById("btnPaxTarget");
       if (btn) btn.classList.remove("active-pax");
-      setPaxTargetPos(lng, lat);
-      showHint("Ziel aktiv.");
+      setPaxTargetPos(lng, lat, "map");
+      clearTargetLocationSelection();
+      hideHint();
       updatePaxUI();
     }
 
@@ -1519,7 +1758,6 @@
         updatePaxUI();
         return;
       }
-      exitPaxMarkerMode(); // sicherstellen dass Treffpunkt-Modus beendet ist
       beginPaxTargetMode();
       paxTargetOpen = true;
       document.getElementById("btnPaxTarget").classList.add("active-pax");
@@ -1527,10 +1765,29 @@
       updatePaxUI();
     });
 
-    function setPaxMarkerPos(lng, lat, fromGps = false) {
+    document.getElementById("btnPaxTargetClear")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearPaxTargetMapSelection();
+    });
+
+    document.getElementById("btnPaxTargetAddressClear")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearPaxTargetAddressSelection();
+      updatePaxUI();
+    });
+
+    function setPaxMarkerPos(lng, lat, source = "map", label = "") {
       if (isPaxInputLocked()) return;
+      const pickupSource = source === true ? "gps" : (source || "map");
       paxLng = lng; paxLat = lat;
-      paxPickupSource = fromGps ? "gps" : "map";
+      paxPickupSource = pickupSource;
+      paxPickupLabel = label || "";
+      if (paxPickupSource === "map") {
+        paxPickupMapLng = lng;
+        paxPickupMapLat = lat;
+      }
       paxPendingPickupLat = null;
       paxPendingPickupLng = null;
       // GPS-Verifikation bleibt erhalten – Treffpunkt anpassen hebt Verifikation nicht auf
@@ -1579,6 +1836,18 @@
       updatePaxUI();
     }
 
+    function restorePaxPickupMarkerToConfirmed() {
+      paxPendingPickupLng = null;
+      paxPendingPickupLat = null;
+      if (hasValidPaxPickup()) {
+        paxMarker?.setLngLat([paxLng, paxLat]);
+      } else if (paxMarker) {
+        paxMarker.remove();
+        paxMarker = null;
+      }
+      syncPaxMarkerDraggable();
+    }
+
     function beginPaxMarkerMode() {
       paxPendingPickupLng = null;
       paxPendingPickupLat = null;
@@ -1603,11 +1872,15 @@
       paxLng = paxPendingPickupLng;
       paxLat = paxPendingPickupLat;
       paxPickupSource = "map";
+      paxPickupLabel = "";
+      paxPickupMapLng = paxLng;
+      paxPickupMapLat = paxLat;
+      clearPickupLocationSelection();
       paxPendingPickupLng = null;
       paxPendingPickupLat = null;
       exitPaxMarkerMode();
       paxPickupEditOpen = true;
-      showHint("Treffpunkt aktiv.");
+      hideHint();
       updatePaxUI();
     }
 
@@ -1621,9 +1894,30 @@
     }
 
     const PAX_LOCATION_SUGGEST_LIMIT = 3;
-    let paxPickupLocationSessionToken = null;
-    let paxPickupLocationAbort = null;
-    let paxPickupLocationTimer = null;
+    const paxLocationSearchState = {
+      pickup: { sessionToken: null, abort: null, timer: null },
+      target: { sessionToken: null, abort: null, timer: null }
+    };
+    const paxLocationSearchConfig = {
+      pickup: {
+        rootId: "paxPickupLocationSearch",
+        inputId: "paxPickupLocationInput",
+        resultsId: "paxPickupLocationResults",
+        messageId: "paxPickupLocationMessage",
+        getProximity: getPickupLocationProximity,
+        apply: applyPaxPickupLocationResult,
+        successMessage: () => "aktiv"
+      },
+      target: {
+        rootId: "paxTargetLocationSearch",
+        inputId: "paxTargetLocationInput",
+        resultsId: "paxTargetLocationResults",
+        messageId: "paxTargetLocationMessage",
+        getProximity: getTargetLocationProximity,
+        apply: applyPaxTargetLocationResult,
+        successMessage: () => "aktiv"
+      }
+    };
 
     function createSearchSessionToken() {
       if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -1634,30 +1928,150 @@
       });
     }
 
-    function getPickupLocationSessionToken() {
-      if (!paxPickupLocationSessionToken) {
-        paxPickupLocationSessionToken = createSearchSessionToken();
+    function getLocationSearchSessionToken(kind) {
+      const state = paxLocationSearchState[kind];
+      if (!state.sessionToken) {
+        state.sessionToken = createSearchSessionToken();
       }
-      return paxPickupLocationSessionToken;
+      return state.sessionToken;
     }
 
-    function resetPickupLocationSession() {
-      paxPickupLocationSessionToken = null;
+    function resetLocationSearchSession(kind) {
+      paxLocationSearchState[kind].sessionToken = null;
     }
 
-    function setPickupLocationMessage(text) {
-      const el = document.getElementById("paxPickupLocationMessage");
+    function setLocationSearchMessage(kind, text) {
+      const el = document.getElementById(paxLocationSearchConfig[kind].messageId);
       if (el) el.textContent = text || "";
     }
 
-    function clearPickupLocationResults() {
-      const resultsEl = document.getElementById("paxPickupLocationResults");
+    function clearLocationSearchResults(kind) {
+      const resultsEl = document.getElementById(paxLocationSearchConfig[kind].resultsId);
       if (!resultsEl) return;
       resultsEl.innerHTML = "";
       resultsEl.classList.remove("show");
     }
 
+    function getLocationDisplayLabel(result) {
+      return result?.label || result?.address || "Adresse";
+    }
+
+    function setLocationSearchActiveUi(kind, label) {
+      const config = paxLocationSearchConfig[kind];
+      const root = document.getElementById(config.rootId);
+      const input = document.getElementById(config.inputId);
+      root?.classList.add("location-active");
+      if (input && document.activeElement !== input) input.value = label || input.value;
+      setLocationSearchMessage(kind, "aktiv");
+    }
+
+    function clearLocationSearchActiveUi(kind) {
+      const root = document.getElementById(paxLocationSearchConfig[kind].rootId);
+      root?.classList.remove("location-active");
+    }
+
+    function setPickupLocationMessage(text) {
+      setLocationSearchMessage("pickup", text);
+    }
+
+    function clearPickupLocationResults() {
+      clearLocationSearchResults("pickup");
+    }
+
+    function clearPickupLocationSelection() {
+      const input = document.getElementById(paxLocationSearchConfig.pickup.inputId);
+      if (input) input.value = "";
+      clearLocationSearchActiveUi("pickup");
+      clearLocationSearchResults("pickup");
+      setLocationSearchMessage("pickup", "");
+      resetLocationSearchSession("pickup");
+    }
+
+    function clearPaxPickupAddressSelection() {
+      const addressWasActivePickup = paxPickupSource === "address";
+      paxPickupLabel = "";
+      clearPickupLocationSelection();
+
+      if (!addressWasActivePickup) return;
+
+      paxLat = null;
+      paxLng = null;
+      paxPickupSource = null;
+      paxPendingPickupLng = null;
+      paxPendingPickupLat = null;
+      restorePaxPickupMarkerToConfirmed();
+    }
+
+    function clearPaxPickupMapSelection() {
+      const mapWasActivePickup = paxPickupSource === "map";
+      paxPickupMapLat = null;
+      paxPickupMapLng = null;
+      paxPendingPickupLng = null;
+      paxPendingPickupLat = null;
+      paxMarkerMode = false;
+
+      if (mapWasActivePickup) {
+        paxLat = null;
+        paxLng = null;
+        paxPickupSource = null;
+      }
+
+      restorePaxPickupMarkerToConfirmed();
+      hideHint();
+      updatePaxUI();
+    }
+
+    function clearTargetLocationSelection() {
+      const input = document.getElementById(paxLocationSearchConfig.target.inputId);
+      if (input) input.value = "";
+      clearLocationSearchActiveUi("target");
+      clearLocationSearchResults("target");
+      setLocationSearchMessage("target", "");
+      resetLocationSearchSession("target");
+    }
+
+    function clearPaxTargetAddressSelection() {
+      const addressWasActiveTarget = paxTargetSource === "address";
+      paxTargetAddressResult = null;
+      clearTargetLocationSelection();
+
+      if (!addressWasActiveTarget) return;
+
+      paxTargetLat = null;
+      paxTargetLng = null;
+      paxTargetSource = null;
+      paxPendingTargetLng = null;
+      paxPendingTargetLat = null;
+      restorePaxTargetMarkerToConfirmed();
+    }
+
+    function clearPaxTargetMapSelection() {
+      const mapWasActiveTarget = paxTargetSource === "map";
+      paxTargetMapLat = null;
+      paxTargetMapLng = null;
+      paxPendingTargetLng = null;
+      paxPendingTargetLat = null;
+      paxTargetMode = false;
+
+      if (mapWasActiveTarget) {
+        paxTargetLat = null;
+        paxTargetLng = null;
+        paxTargetSource = null;
+      }
+
+      restorePaxTargetMarkerToConfirmed();
+      hideHint();
+      updatePaxUI();
+    }
+
     function getPickupLocationProximity() {
+      if (hasValidPaxPickup()) return `${paxLng},${paxLat}`;
+      const center = map?.getCenter?.();
+      return center ? `${center.lng},${center.lat}` : `${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`;
+    }
+
+    function getTargetLocationProximity() {
+      if (hasValidPaxTarget()) return `${paxTargetLng},${paxTargetLat}`;
       if (hasValidPaxPickup()) return `${paxLng},${paxLat}`;
       const center = map?.getCenter?.();
       return center ? `${center.lng},${center.lat}` : `${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`;
@@ -1671,8 +2085,8 @@
       return suggestion?.full_address || suggestion?.place_formatted || suggestion?.address || "";
     }
 
-    function renderPickupLocationResults(suggestions) {
-      const resultsEl = document.getElementById("paxPickupLocationResults");
+    function renderLocationSearchResults(kind, suggestions) {
+      const resultsEl = document.getElementById(paxLocationSearchConfig[kind].resultsId);
       if (!resultsEl) return;
       resultsEl.innerHTML = "";
       const visible = suggestions.slice(0, PAX_LOCATION_SUGGEST_LIMIT);
@@ -1690,13 +2104,17 @@
         sub.textContent = getSuggestionAddress(suggestion);
 
         btn.append(main, sub);
-        btn.addEventListener("click", () => selectPickupLocationSuggestion(suggestion));
+        btn.addEventListener("click", () => selectLocationSuggestion(kind, suggestion));
         resultsEl.append(btn);
       });
       resultsEl.classList.toggle("show", visible.length > 0);
     }
 
-    function normalizePickupLocationResult(feature, suggestion) {
+    function renderPickupLocationResults(suggestions) {
+      renderLocationSearchResults("pickup", suggestions);
+    }
+
+    function normalizeLocationResult(feature, suggestion) {
       const coords = feature?.geometry?.coordinates || feature?.properties?.coordinates;
       const lng = Number(Array.isArray(coords) ? coords[0] : coords?.longitude);
       const lat = Number(Array.isArray(coords) ? coords[1] : coords?.latitude);
@@ -1714,128 +2132,248 @@
       };
     }
 
-    function applyPaxPickupLocationResult(result) {
+    function normalizePickupLocationResult(feature, suggestion) {
+      return normalizeLocationResult(feature, suggestion);
+    }
+
+    function getValidLocationCoordinates(result, kind) {
       const lat = Number(result?.lat);
       const lng = Number(result?.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        setPickupLocationMessage("Position konnte nicht gelesen werden.");
-        return false;
+        setLocationSearchMessage(kind, "Position konnte nicht gelesen werden.");
+        return null;
       }
       if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        setPickupLocationMessage("Position liegt außerhalb des gültigen Bereichs.");
-        return false;
+        setLocationSearchMessage(kind, "Position liegt außerhalb des gültigen Bereichs.");
+        return null;
       }
+      return { lng, lat };
+    }
+
+    function applyPaxPickupLocationResult(result) {
+      const coords = getValidLocationCoordinates(result, "pickup");
+      if (!coords) return false;
+      const { lng, lat } = coords;
+      const label = getLocationDisplayLabel(result);
       exitPaxTargetMode();
-      beginPaxMarkerMode();
-      setPaxPendingMarkerPos(lng, lat);
+      exitPaxMarkerMode();
+      setPaxMarkerPos(lng, lat, "address", label);
       paxPickupEditOpen = true;
       focusPaxPickupOnMap(lng, lat);
-      showHint("Treffpunkt fixieren, wenn die Position passt.");
+      setLocationSearchActiveUi("pickup", label);
       updatePaxUI();
       return true;
     }
 
-    async function fetchPickupLocationSuggestions(query) {
+    function focusPaxTargetOnMap(lng, lat) {
+      focusPaxPickupOnMap(lng, lat);
+    }
+
+    function applyPaxTargetLocationResult(result) {
+      const coords = getValidLocationCoordinates(result, "target");
+      if (!coords) return false;
+      const { lng, lat } = coords;
+      paxTargetAddressResult = {
+        ...result,
+        lat,
+        lng,
+        label: result.label || result.address || "Zieladresse",
+        address: result.address || result.label || ""
+      };
+      const label = getLocationDisplayLabel(paxTargetAddressResult);
+      exitPaxMarkerMode();
+      exitPaxTargetMode();
+      paxTargetOpen = true;
+      setPaxTargetPos(lng, lat, "address");
+      focusPaxTargetOnMap(lng, lat);
+      setLocationSearchActiveUi("target", label);
+      updatePaxUI();
+      return true;
+    }
+
+    function reactivateStoredPaxTargetAddress() {
+      if (!paxTargetAddressResult || paxTargetSource === "address") return false;
+      const coords = getValidLocationCoordinates(paxTargetAddressResult, "target");
+      if (!coords) return false;
+      const { lng, lat } = coords;
+      exitPaxMarkerMode();
+      exitPaxTargetMode();
+      paxTargetOpen = true;
+      setPaxTargetPos(lng, lat, "address");
+      focusPaxTargetOnMap(lng, lat);
+      setLocationSearchActiveUi("target", getLocationDisplayLabel(paxTargetAddressResult));
+      updatePaxUI();
+      return true;
+    }
+
+    async function fetchLocationSuggestions(kind, query) {
       const token = CONFIG?.mapboxToken;
       if (!token || !String(token).startsWith("pk.")) throw new Error("Kein Mapbox-Token verfügbar.");
+      const state = paxLocationSearchState[kind];
+      const config = paxLocationSearchConfig[kind];
       const params = new URLSearchParams({
         q: query,
         access_token: token,
-        session_token: getPickupLocationSessionToken(),
+        session_token: getLocationSearchSessionToken(kind),
         limit: String(PAX_LOCATION_SUGGEST_LIMIT),
         language: "de",
         country: "de",
-        proximity: getPickupLocationProximity()
+        proximity: config.getProximity()
       });
-      paxPickupLocationAbort?.abort();
-      paxPickupLocationAbort = new AbortController();
+      state.abort?.abort();
+      state.abort = new AbortController();
       const url = `https://api.mapbox.com/search/searchbox/v1/suggest?${params.toString()}`;
-      const res = await fetch(url, { signal: paxPickupLocationAbort.signal });
+      const res = await fetch(url, { signal: state.abort.signal });
       if (!res.ok) throw new Error("Adresssuche nicht erreichbar.");
       const data = await res.json();
       return Array.isArray(data?.suggestions) ? data.suggestions : [];
     }
 
-    async function selectPickupLocationSuggestion(suggestion) {
+    async function fetchPickupLocationSuggestions(query) {
+      return fetchLocationSuggestions("pickup", query);
+    }
+
+    async function selectLocationSuggestion(kind, suggestion) {
       const mapboxId = suggestion?.mapbox_id;
-      if (!mapboxId) return setPickupLocationMessage("Vorschlag konnte nicht gelesen werden.");
-      const input = document.getElementById("paxPickupLocationInput");
+      const config = paxLocationSearchConfig[kind];
+      if (!mapboxId) return setLocationSearchMessage(kind, "Vorschlag konnte nicht gelesen werden.");
+      const input = document.getElementById(config.inputId);
       if (input) {
         input.value = getSuggestionLabel(suggestion);
         input.blur();
       }
-      clearPickupLocationResults();
-      setPickupLocationMessage("Position wird übernommen...");
+      clearLocationSearchResults(kind);
+      setLocationSearchMessage(kind, "Position wird übernommen...");
       try {
         const params = new URLSearchParams({
           access_token: CONFIG.mapboxToken,
-          session_token: getPickupLocationSessionToken()
+          session_token: getLocationSearchSessionToken(kind)
         });
         const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${params.toString()}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Adresse konnte nicht geladen werden.");
         const data = await res.json();
         const feature = Array.isArray(data?.features) ? data.features[0] : null;
-        const location = normalizePickupLocationResult(feature, suggestion);
+        const location = normalizeLocationResult(feature, suggestion);
         if (!location) throw new Error("Adresse hat keine gültige Position.");
-        if (applyPaxPickupLocationResult(location)) {
-          setPickupLocationMessage(location.address || location.label || "Position vorgeschlagen.");
-          resetPickupLocationSession();
+        if (config.apply(location)) {
+          if (input) input.value = getLocationDisplayLabel(location);
+          setLocationSearchMessage(kind, "aktiv");
+          resetLocationSearchSession(kind);
         }
       } catch (err) {
-        setPickupLocationMessage(err?.message || "Adresse konnte nicht geladen werden.");
+        setLocationSearchMessage(kind, err?.message || "Adresse konnte nicht geladen werden.");
       }
     }
 
-    function initPaxPickupLocationSearch() {
-      const input = document.getElementById("paxPickupLocationInput");
+    async function selectPickupLocationSuggestion(suggestion) {
+      return selectLocationSuggestion("pickup", suggestion);
+    }
+
+    function initPaxLocationSearch(kind) {
+      const config = paxLocationSearchConfig[kind];
+      const state = paxLocationSearchState[kind];
+      const input = document.getElementById(config.inputId);
       if (!input) return;
+      input.addEventListener("focus", () => {
+        if (kind !== "target" || !paxTargetAddressResult || paxTargetSource === "address") return;
+        const savedText = paxTargetAddressResult.address || paxTargetAddressResult.label || "";
+        if (input.value.trim() === savedText.trim()) {
+          reactivateStoredPaxTargetAddress();
+          input.blur();
+        }
+      });
       input.addEventListener("input", () => {
         const query = input.value.trim();
-        clearTimeout(paxPickupLocationTimer);
-        if (query.length < 3) {
-          paxPickupLocationAbort?.abort();
-          clearPickupLocationResults();
-          setPickupLocationMessage(query ? "Bitte mindestens 3 Zeichen eingeben." : "");
+        clearLocationSearchActiveUi(kind);
+        clearTimeout(state.timer);
+        if (!query) {
+          state.abort?.abort();
+          if (kind === "target") {
+            clearPaxTargetAddressSelection();
+          } else if (kind === "pickup") {
+            clearPaxPickupAddressSelection();
+          }
+          updatePaxUI();
           return;
         }
-        setPickupLocationMessage("Adresse wird gesucht...");
-        paxPickupLocationTimer = setTimeout(async () => {
+        if (query.length < 3) {
+          state.abort?.abort();
+          clearLocationSearchResults(kind);
+          setLocationSearchMessage(kind, query ? "Bitte mindestens 3 Zeichen eingeben." : "");
+          return;
+        }
+        setLocationSearchMessage(kind, "Adresse wird gesucht...");
+        state.timer = setTimeout(async () => {
           try {
-            const suggestions = await fetchPickupLocationSuggestions(query);
+            const suggestions = await fetchLocationSuggestions(kind, query);
             if (input.value.trim() !== query) return;
-            renderPickupLocationResults(suggestions);
-            setPickupLocationMessage(suggestions.length ? "" : "Keine passende Adresse gefunden.");
+            renderLocationSearchResults(kind, suggestions);
+            setLocationSearchMessage(kind, suggestions.length ? "" : "Keine passende Adresse gefunden.");
           } catch (err) {
             if (err?.name === "AbortError") return;
-            clearPickupLocationResults();
-            setPickupLocationMessage(err?.message || "Adresssuche braucht Internet.");
+            clearLocationSearchResults(kind);
+            setLocationSearchMessage(kind, err?.message || "Adresssuche braucht Internet.");
           }
         }, 260);
       });
       input.addEventListener("search", () => {
         if (!input.value.trim()) {
-          paxPickupLocationAbort?.abort();
-          clearPickupLocationResults();
-          setPickupLocationMessage("");
-          resetPickupLocationSession();
+          state.abort?.abort();
+          if (kind === "target") {
+            clearPaxTargetAddressSelection();
+            updatePaxUI();
+            return;
+          } else if (kind === "pickup") {
+            clearPaxPickupAddressSelection();
+            updatePaxUI();
+            return;
+          }
+          clearLocationSearchResults(kind);
+          setLocationSearchMessage(kind, "");
+          resetLocationSearchSession(kind);
         }
       });
       input.addEventListener("blur", () => {
         window.setTimeout(() => {
-          if (!document.activeElement?.closest?.("#paxPickupLocationSearch")) {
-            clearPickupLocationResults();
+          if (!document.activeElement?.closest?.(`#${config.rootId}`)) {
+            clearLocationSearchResults(kind);
           }
         }, 160);
       });
+    }
+
+    function initPaxPickupLocationSearch() {
+      initPaxLocationSearch("pickup");
+    }
+
+    function initPaxTargetLocationSearch() {
+      initPaxLocationSearch("target");
     }
 
     function hasValidPaxPickup() {
       return paxLat !== null && paxLng !== null;
     }
 
+    function hasConfirmedPaxPickupMap() {
+      return paxPickupMapLat !== null && paxPickupMapLng !== null;
+    }
+
     function hasValidPaxTarget() {
       return paxTargetLat !== null && paxTargetLng !== null;
+    }
+
+    function hasAnyPaxTargetState() {
+      return !!paxTargetAddressResult
+        || paxTargetSource === "address"
+        || paxTargetSource === "map"
+        || hasValidPaxTarget()
+        || hasConfirmedPaxTargetMap()
+        || hasPendingPaxTarget();
+    }
+
+    function hasConfirmedPaxTargetMap() {
+      return paxTargetMapLat !== null && paxTargetMapLng !== null;
     }
 
     function isPaxSearchReady() {
@@ -1845,23 +2383,30 @@
     function getPaxTargetUiState() {
       const hasTarget = hasValidPaxTarget();
       const hasPendingTarget = hasPendingPaxTarget();
+      const hasActiveMapTarget = hasTarget && paxTargetSource === "map" && hasConfirmedPaxTargetMap();
 
       if (paxTargetMode) {
         return {
-          headerText: hasPendingTarget ? "Ziel fixieren" : "Ziel auf Karte wählen",
+          headerText: "",
           headerClassName: "pax-acc-value",
-          bodyText: "Ziel auf Karte wählen",
+          bodyText: "Ankunft auf Karte wählen",
           bodyClassName: "pax-status",
-          buttonText: hasPendingTarget ? "Ziel fixieren" : "Ziel auf Karte wählen"
+          buttonMainText: hasPendingTarget ? "Ziel fixieren" : "Ankunft auf Karte wählen",
+          buttonSubText: hasPendingTarget ? "Position übernehmen" : "Position selbst auf Karte festlegen",
+          mapActive: false,
+          mapClearVisible: hasConfirmedPaxTargetMap()
         };
       }
 
       return {
-        headerText: hasTarget ? "Ziel aktiv" : "Ziel wählen",
+        headerText: hasTarget ? "aktiv" : "",
         headerClassName: hasTarget ? "pax-acc-value set" : "pax-acc-value",
         bodyText: "",
         bodyClassName: hasTarget ? "pax-status set" : "pax-status",
-        buttonText: hasTarget ? "Ziel aktiv" : "Ziel wählen"
+        buttonMainText: hasActiveMapTarget ? "Ziel" : "Ankunft auf Karte wählen",
+        buttonSubText: hasActiveMapTarget ? "aktiv" : "Position selbst auf Karte festlegen",
+        mapActive: hasActiveMapTarget,
+        mapClearVisible: false
       };
     }
 
@@ -1869,10 +2414,11 @@
       const hasPickup = hasValidPaxPickup();
       const hasPendingPickup = hasPendingPaxPickup();
       const confirmedGps = hasPickup && paxPickupSource === "gps";
+      const confirmedAddress = hasPickup && paxPickupSource === "address";
       const confirmedMap = hasPickup && paxPickupSource === "map";
       const isGps = confirmedGps && !paxMarkerMode;
-      const isMap = confirmedMap && !paxMarkerMode;
-      const activeText = confirmedGps ? "GPS-Standort aktiv" : "Treffpunkt aktiv";
+      const isAddress = confirmedAddress && !paxMarkerMode;
+      const isMap = confirmedMap && hasConfirmedPaxPickupMap() && !paxMarkerMode;
 
       if (paxMarkerMode) {
         return {
@@ -1882,24 +2428,30 @@
           bodyText: "Treffpunkt auf Karte wählen",
           bodyClassName: "pax-status",
           gpsActive: confirmedGps,
-          gpsSubText: confirmedGps ? "GPS-Standort aktiv" : "GPS-Standort nicht aktiv",
+          gpsMainText: "GPS-Standort",
+          gpsSubText: confirmedGps ? "aktiv" : "Aktuellen Standort verwenden",
+          addressActive: confirmedAddress,
           mapActive: false,
-          mapMainText: hasPendingPickup ? "Treffpunkt fixieren" : "Treffpunkt wählen",
-          mapSubText: hasPendingPickup ? "Position übernehmen" : "Auf Karte antippen"
+          mapMainText: hasPendingPickup ? "Treffpunkt fixieren" : "Treffpunkt auf Karte wählen",
+          mapSubText: hasPendingPickup ? "Position übernehmen" : "Position selbst auf Karte festlegen",
+          mapClearVisible: hasConfirmedPaxPickupMap()
         };
       }
 
       return {
         hasPickup,
-        headerText: hasPickup ? activeText : "",
+        headerText: hasPickup ? "aktiv" : "",
         headerClassName: hasPickup ? "pax-acc-value set" : "pax-acc-value",
-        bodyText: confirmedMap ? "" : (hasPickup ? activeText : ""),
+        bodyText: "",
         bodyClassName: hasPickup ? "pax-status set" : "pax-status",
         gpsActive: isGps,
-        gpsSubText: isGps ? "GPS-Standort aktiv" : "GPS-Standort nicht aktiv",
+        gpsMainText: "GPS-Standort",
+        gpsSubText: isGps ? "aktiv" : "Aktuellen Standort verwenden",
+        addressActive: isAddress,
         mapActive: isMap,
-        mapMainText: isMap ? "Treffpunkt aktiv" : "Treffpunkt wählen",
-        mapSubText: isMap ? "" : "Treffpunkt nicht aktiv"
+        mapMainText: isMap ? "Treffpunkt" : "Treffpunkt auf Karte wählen",
+        mapSubText: isMap ? "aktiv" : "Position selbst auf Karte festlegen",
+        mapClearVisible: false
       };
     }
 
@@ -1911,6 +2463,10 @@
       const targetBlock  = document.getElementById("paxTargetBlock");
       const targetStatus = document.getElementById("paxTargetStatus");
       const btnTarget    = document.getElementById("btnPaxTarget");
+      const targetAddressChoiceRow = document.getElementById("paxTargetAddressChoiceRow");
+      const btnTargetAddressClear = document.getElementById("btnPaxTargetAddressClear");
+      const targetMapChoiceRow = document.getElementById("paxTargetMapChoiceRow");
+      const btnTargetClear = document.getElementById("btnPaxTargetClear");
       const searchBlock  = document.getElementById("paxSearchBlock");
       const searchBtn   = document.getElementById("btnPaxSearch");
       const cancelBtn   = document.getElementById("btnPaxCancel");
@@ -1925,11 +2481,14 @@
       }
 
       const hasMarker = hasValidPaxPickup();
+      const hasTarget = hasValidPaxTarget();
+      const targetReachable = hasMarker || hasAnyPaxTargetState();
       const hasTime   = true; // Startzeit ist mit Default "jetzt" immer gesetzt
       const pickupUi = getPaxPickupUiState();
       const targetUi = getPaxTargetUiState();
       const pickupEditPending = paxMarkerMode || hasPendingPaxPickup();
       const targetEditPending = paxTargetMode || hasPendingPaxTarget();
+      const targetAddressActive = hasTarget && paxTargetSource === "address" && !!paxTargetAddressResult && !paxTargetMode;
 
       if (hasMarker || paxMarkerMode) {
         statusEl.textContent = pickupUi.bodyText;
@@ -1943,10 +2502,8 @@
         hintEl.textContent = "Abholpunkt setzen um Fahrer zu finden.";
       }
 
-      const hasTarget = hasValidPaxTarget();
-
-      // Zielblock: sichtbar sobald Abholpunkt gesetzt
-      if (targetBlock) targetBlock.style.display = hasMarker ? "" : "none";
+      // Ziel bleibt erreichbar, wenn bereits ein Target-State existiert.
+      if (targetBlock) targetBlock.style.display = targetReachable ? "" : "none";
 
       // Zielstatus
       if (targetStatus) {
@@ -1956,11 +2513,17 @@
 
       // Ziel-Button: gesperrt bei aktiver Suche oder Cooldown
       if (btnTarget) {
+        const btnTargetMain = btnTarget.querySelector(".pax-btn-main");
+        const btnTargetSub = btnTarget.querySelector(".pax-btn-sub");
         btnTarget.disabled = paxSearchActive || onCooldown;
-        btnTarget.classList.toggle("active-pax", paxTargetMode);
-        btnTarget.classList.toggle("target-active", hasTarget && !targetEditPending);
-        btnTarget.textContent = targetUi.buttonText;
+        btnTarget.classList.toggle("active-pax", paxTargetMode || (targetUi.mapActive && !targetEditPending));
+        btnTarget.classList.toggle("target-active", targetUi.mapActive && !targetEditPending);
+        btnTarget.classList.toggle("map-editing", paxTargetMode);
+        if (btnTargetMain) btnTargetMain.textContent = targetUi.buttonMainText;
+        if (btnTargetSub) btnTargetSub.textContent = targetUi.buttonSubText;
       }
+      if (targetMapChoiceRow) targetMapChoiceRow.classList.toggle("show-clear", !!targetUi.mapClearVisible);
+      if (btnTargetClear) btnTargetClear.hidden = !targetUi.mapClearVisible;
 
       // Suchblock: nur wenn Abholpunkt + Ziel gesetzt
       if (searchBlock) {
@@ -1991,12 +2554,30 @@
       // GPS + Marker-Buttons während Cooldown sperren
       const btnGps    = document.getElementById("btnPaxGps");
       const btnMarker = document.getElementById("btnPaxMarker");
+      const pickupAddressChoiceRow = document.getElementById("paxPickupAddressChoiceRow");
+      const btnPickupAddressClear = document.getElementById("btnPaxPickupAddressClear");
+      const pickupMapChoiceRow = document.getElementById("paxPickupMapChoiceRow");
+      const btnMarkerClear = document.getElementById("btnPaxMarkerClear");
       const pickupLocationInput = document.getElementById("paxPickupLocationInput");
+      const targetLocationInput = document.getElementById("paxTargetLocationInput");
       if (pickupLocationInput) pickupLocationInput.disabled = paxSearchActive || onCooldown;
+      if (targetLocationInput) targetLocationInput.disabled = paxSearchActive || onCooldown;
+      if (!paxSearchActive && !onCooldown && document.activeElement !== pickupLocationInput && pickupUi.addressActive) {
+        setLocationSearchActiveUi("pickup", paxPickupLabel || "Adresse");
+      }
+      if (!paxSearchActive && !onCooldown && document.activeElement !== targetLocationInput && targetAddressActive) {
+        setLocationSearchActiveUi("target", getLocationDisplayLabel(paxTargetAddressResult));
+      }
+      if (pickupAddressChoiceRow) pickupAddressChoiceRow.classList.toggle("show-clear", !!pickupUi.addressActive);
+      if (btnPickupAddressClear) btnPickupAddressClear.hidden = !pickupUi.addressActive;
+      if (targetAddressChoiceRow) targetAddressChoiceRow.classList.toggle("show-clear", !!targetAddressActive);
+      if (btnTargetAddressClear) btnTargetAddressClear.hidden = !targetAddressActive;
       if (btnGps) {
+        const btnGpsMain = btnGps.querySelector(".pax-btn-main");
         const btnGpsSub = btnGps.querySelector(".pax-btn-sub");
         btnGps.disabled = paxSearchActive || onCooldown;
         btnGps.classList.toggle("active-pax", pickupUi.gpsActive);
+        if (btnGpsMain) btnGpsMain.textContent = pickupUi.gpsMainText;
         if (btnGpsSub) btnGpsSub.textContent = pickupUi.gpsSubText;
       }
       if (btnMarker) {
@@ -2004,9 +2585,12 @@
         const btnMarkerSub = btnMarker.querySelector(".pax-btn-sub");
         btnMarker.disabled = paxSearchActive || onCooldown;
         btnMarker.classList.toggle("active-pax", pickupUi.mapActive);
+        btnMarker.classList.toggle("map-editing", paxMarkerMode);
         if (btnMarkerMain) btnMarkerMain.textContent = pickupUi.mapMainText;
         if (btnMarkerSub) btnMarkerSub.textContent = pickupUi.mapSubText;
       }
+      if (pickupMapChoiceRow) pickupMapChoiceRow.classList.toggle("show-clear", !!pickupUi.mapClearVisible);
+      if (btnMarkerClear) btnMarkerClear.hidden = !pickupUi.mapClearVisible;
 
       // Such-Button folgt der Produktregel: Abholpunkt + Ziel + gueltige Startzeit
       if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || pickupEditPending || targetEditPending || !isPaxSearchReady();
@@ -2027,7 +2611,7 @@
       const b1label = document.getElementById("paxAccLabel1");
       const b1body = document.getElementById("paxAccBody1");
       const b1hdr  = document.getElementById("paxAccHeader1");
-      if (b1label) b1label.textContent = hasMarker ? "Abholpunkt" : "Wo möchtest du abgeholt werden?";
+      if (b1label) b1label.textContent = "Abholung";
       if (b1hdr) b1hdr.classList.toggle("pickup-empty", !hasMarker);
       if (b1val) {
         b1val.textContent = pickupUi.headerText;
@@ -2062,14 +2646,14 @@
       const b3val   = document.getElementById("paxAccVal3");
       const b3body  = document.getElementById("paxTargetBlock");
       const b3hdr   = document.getElementById("paxAccHeader3");
-      if (b3block) b3block.style.display = hasMarker ? "" : "none";
+      if (b3block) b3block.style.display = targetReachable ? "" : "none";
       if (b3val) {
         b3val.textContent = targetUi.headerText;
         b3val.className = targetUi.headerClassName;
       }
       if (b3body) {
         // Offen wenn: kein Ziel gesetzt, Ziel-Modus aktiv, oder Nutzer den Zielbereich offen haelt.
-        const b3open = hasMarker && (!hasTarget || paxTargetMode || paxTargetOpen);
+        const b3open = targetReachable && (!hasTarget || paxTargetMode || paxTargetOpen);
         b3body.classList.toggle("pax-closed", !b3open);
       }
       if (b3hdr) b3hdr.classList.toggle("locked", locked);
@@ -2086,7 +2670,6 @@
       // Header 1: Abholpunkt-Bearbeitung oeffnen/schliessen, ohne Marker freizugeben
       document.getElementById("paxAccHeader1")?.addEventListener("click", () => {
         if (paxSearchActive || Date.now() < paxCooldownUntil) return;
-        exitPaxTargetMode();
         if (paxMarkerMode) {
           exitPaxMarkerMode();
           paxPickupEditOpen = true;
@@ -2120,7 +2703,6 @@
             paxTargetOpen = !paxTargetOpen;
             hideHint();
           } else {
-            exitPaxMarkerMode();
             beginPaxTargetMode();
             paxTargetOpen = true;
             const btn = document.getElementById("btnPaxTarget");
@@ -2151,7 +2733,8 @@
           paxHasGps = true;                    // GPS-Verifikation gesetzt
           exitPaxMarkerMode();               // Marker-Modus beenden (GPS = kein manueller Modus)
           paxPickupEditOpen = keepPickupEditOpen;
-          setPaxMarkerPos(lng, lat, true);   // fromGps=true → paxHasGps bleibt true
+          clearPickupLocationSelection();
+          setPaxMarkerPos(lng, lat, "gps");  // GPS bestaetigt den Abholpunkt direkt
           focusPaxPickupOnMap(lng, lat);
           updatePaxUI();              // Such-Button entsperren
         },
@@ -2165,18 +2748,30 @@
         confirmPaxPendingPickup();
         return;
       }
-      // Marker-Modus aktivieren – Ziel-Modus beenden falls aktiv
-      exitPaxTargetMode();
+      // Marker-Modus aktivieren
       beginPaxMarkerMode();
       showHint("Treffpunkt auf der Karte wählen.");
       updatePaxUI(); // Draggability sofort aktivieren
     });
 
+    document.getElementById("btnPaxMarkerClear")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearPaxPickupMapSelection();
+    });
+
+    document.getElementById("btnPaxPickupAddressClear")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearPaxPickupAddressSelection();
+      updatePaxUI();
+    });
+
     // ─────────────────────────────────────────────────
     // ZEITFENSTER: GPS-artiges HH:MM-Feld, intern bleibt paxTimeMin
     // ─────────────────────────────────────────────────
-    const PAX_STEP_MIN  = 0;    // frühester Wert: jetzt
-    const PAX_STEP_MAX  = 180;  // spätester Wert: 3 Std
+    const PAX_STEP_MIN  = 0;          // fruehester Wert: jetzt
+    const PAX_STEP_MAX  = 23 * 60 + 59; // spaetester Wert: heute 23:59
     const PAX_TIME_PLACEHOLDER = "HH:MM";
 
     function padTimePart(value) {
@@ -2208,7 +2803,7 @@
       const target = new Date(base);
       target.setHours(h, m, 0, 0);
       let diffMin = Math.round((target.getTime() - base.getTime()) / 60_000);
-      if (diffMin < 0) diffMin += 24 * 60;
+      if (diffMin < 0) return null;
       return diffMin;
     }
 
@@ -2247,7 +2842,7 @@
         paxDesiredTime = rawValue;
         paxTimeUserSet = true;
         updatePaxUI();
-        if (showMessage) showHint("Bitte eine Startzeit innerhalb der nächsten 3 Stunden wählen.");
+        if (showMessage) showHint("Bitte eine noch bevorstehende Startzeit wählen.");
         return false;
       }
       paxDesiredTime = rawValue;
@@ -3799,7 +4394,7 @@
       map.on("click", (e) => {
         if (markerPopup) { markerPopup.remove(); markerPopup = null; }
         if (ridePopup)   { ridePopup.remove();   ridePopup   = null; }
-        // Mitfahrer: Modi sind gegenseitig ausschließend (else if)
+        // Mitfahrer: Kartenklick setzt nur einen Pending-Marker, Modi bleiben getrennt.
         if (paxMarkerMode) {
           // Treffpunkt per Kartenklick nur vorpositionieren; bestaetigt wird per Button
           if (!isPaxInputLocked()) {
@@ -4130,6 +4725,7 @@
     document.addEventListener("DOMContentLoaded", () => {
       initAccordionHandlers();
       initPaxPickupLocationSearch();
+      initPaxTargetLocationSearch();
       applyTheme(currentTheme, false);
       document.getElementById("themeToggle")?.addEventListener("click", (e) => {
         e.stopPropagation();
