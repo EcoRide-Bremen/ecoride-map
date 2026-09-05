@@ -3141,6 +3141,7 @@
             const priceText = formatSeatPrice(ride?.preis);
             const item = document.createElement("div");
             item.className = "pax-result-item";
+            item.dataset.driverKey = driverKey;
             const name = document.createElement("div");
             name.className = "pax-result-name";
             name.textContent = ride?.fahrer_name || pos.driver_id || driverKey;
@@ -3186,6 +3187,36 @@
       if (listEl) { listEl.innerHTML = ""; listEl.style.display = "none"; }
       // Cooldown NUR hier starten – Eingabephase (Zeitfenster, Zieltext) bleibt frei
       startPaxCooldown();
+    }
+
+    function handleObservedRideEnded(driverKey) {
+      const key = normId(driverKey);
+      if (!key || !paxSearchActive || !paxMatchedKeys.has(key)) return false;
+
+      paxMatchedKeys.delete(key);
+      const listEl = document.getElementById("paxResultList");
+      if (listEl) {
+        for (const item of listEl.querySelectorAll(".pax-result-item")) {
+          if (item.dataset.driverKey === key) item.remove();
+        }
+        listEl.style.display = paxMatchedKeys.size > 0 ? "flex" : "none";
+      }
+
+      if (paxMatchedKeys.size === 0) {
+        paxSearchActive = false;
+        updatePaxUI();
+      }
+      refreshPaxMatchLayer();
+      updatePanelSearchStatus();
+
+      const statusEl = document.getElementById("paxMatchStatus");
+      if (statusEl) {
+        statusEl.textContent = paxMatchedKeys.size > 0
+          ? `Eine beobachtete Fahrt wurde beendet. ${paxMatchedKeys.size} weitere verfügbar.`
+          : "Die beobachtete Fahrt wurde beendet. Du kannst erneut suchen.";
+        statusEl.className = "pax-match-status show none";
+      }
+      return true;
     }
 
     // Highlight-Layer auf der Karte aktualisieren
@@ -3883,6 +3914,7 @@
     function resetImpactCounters(driverKey) {
       manualEndedAt = Date.now();
       if (driverKey) {
+        handleObservedRideEnded(driverKey);
         snapshotMapState("rideEnd:before-cleanup", driverKey);
         manualEndedDriverKey = driverKey;
         recentlyEnded.add(driverKey);
@@ -4294,6 +4326,7 @@
       let markerChanged = false;
       for (const driverKey of prevDriverKeys) {
         if (!nowDriverKeys.has(driverKey)) {
+          handleObservedRideEnded(driverKey);
           endedDrivers.add(driverKey);
           positions.delete(driverKey);
           routePoints.delete(driverKey);
@@ -4364,6 +4397,7 @@
             const key = normId(payload.old?.driver_id || payload.old?.id || payload.new?.driver_id || payload.new?.id);
             if (key) {
               const endedAt = Date.now();
+              handleObservedRideEnded(key);
               endedDrivers.add(key);
               endedDriverAt.set(key, endedAt);
               recentlyEnded.add(key);
