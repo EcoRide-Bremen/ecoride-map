@@ -876,43 +876,78 @@
     .pax-result-list {
       display: none;
       flex-direction: column;
-      gap: 4px;
-      padding: 4px 10px 6px;
+      gap: 8px;
+      padding: 6px 10px 10px;
       box-sizing: border-box;
-      max-height: 160px;
+      max-height: 220px;
       overflow-y: auto;
     }
     .pax-result-list::-webkit-scrollbar { width: 3px; }
     .pax-result-list::-webkit-scrollbar-thumb { background: rgba(199,223,58,0.25); border-radius: 999px; }
     .pax-result-item {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "name cta"
+        "meta cta";
+      column-gap: 10px;
+      row-gap: 5px;
       align-items: center;
-      justify-content: space-between;
-      padding: 5px 10px;
+      padding: 10px 11px;
       border-radius: 8px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(17,24,37,0.82);
+      border: 1px solid rgba(199,223,58,0.28);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.18);
       cursor: pointer;
-      transition: background .15s;
+      transition: background .15s, border-color .15s, transform .15s;
       font-size: 12px;
       color: #eaf0ff;
     }
     .pax-result-item:hover, .pax-result-item:active {
-      background: rgba(199,223,58,0.12);
-      border-color: rgba(199,223,58,0.25);
+      background: rgba(24,32,45,0.94);
+      border-color: rgba(199,223,58,0.62);
+      transform: translateY(-1px);
     }
     .pax-result-name {
-      font-weight: 600;
+      grid-area: name;
+      font-weight: 800;
+      font-size: 13px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: 180px;
+      min-width: 0;
     }
-    .pax-result-dist {
+    .pax-result-meta {
+      grid-area: meta;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      min-width: 0;
+    }
+    .pax-result-pill {
       font-size: 11px;
-      opacity: 0.6;
+      line-height: 1;
+      color: rgba(234,240,255,0.86);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      padding: 5px 7px;
+      white-space: nowrap;
+    }
+    .pax-result-cta {
+      grid-area: cta;
+      align-self: stretch;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 82px;
+      padding: 0 10px;
+      border-radius: 7px;
+      background: #c7df3a;
+      color: #0b0f14;
+      font-size: 11px;
+      font-weight: 800;
       flex-shrink: 0;
-      margin-left: 8px;
     }
 
     .input-button-group {
@@ -1388,6 +1423,12 @@
         positionTs: pos?.ts || null
       });
     }
+
+    function setDriversSourceData(data) {
+      const source = map?.getSource?.(DRIVERS_SOURCE);
+      if (!source) return;
+      source.setData(data);
+    }
     function logError(code, message, ctx = {}) {
       console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
     }
@@ -1507,6 +1548,70 @@
         if (ride?.status === "angeboten") return true;
         return getDriverRouteState(driverKey) !== "hidden";
       });
+    }
+
+    function hasRunningRideForDriver(driverKey) {
+      if (!driverKey) return false;
+      return [...activeRides.values()].some((ride) => {
+        if (normId(ride?.driver_id) !== driverKey) return false;
+        return (ride?.status || "aktiv") === "aktiv";
+      });
+    }
+
+    function hasPublicRideForDriver(driverKey) {
+      if (!driverKey) return false;
+      return [...activeRides.values()].some((ride) => {
+        if (normId(ride?.driver_id) !== driverKey) return false;
+        return ["angeboten", "aktiv"].includes(ride?.status || "aktiv");
+      });
+    }
+
+    function getPublicRideForDriver(driverKey) {
+      if (!driverKey) return null;
+      return [...activeRides.values()].find((ride) => {
+        if (normId(ride?.driver_id) !== driverKey) return false;
+        return ["angeboten", "aktiv"].includes(ride?.status || "aktiv");
+      }) || null;
+    }
+
+    function formatSeatPrice(value) {
+      if (value === null || value === undefined || value === "") return null;
+      const price = Number(value);
+      if (!Number.isFinite(price) || price < 0) return null;
+      return `${price.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € pro Platz`;
+    }
+
+    function getPaxSearchButtonDisabledReasons({ onCooldown, pickupEditPending, targetEditPending, searchReady, pickupValid, targetValid, timeValid }) {
+      const reasons = [];
+      if (paxSearchActive) reasons.push("search-active");
+      if (onCooldown) reasons.push("input-lock");
+      if (pickupEditPending) reasons.push("pickup-edit-pending");
+      if (targetEditPending) reasons.push("target-edit-pending");
+      if (!pickupValid) reasons.push("no-pickup");
+      if (!targetValid) reasons.push("no-target");
+      if (!timeValid) reasons.push("invalid-time");
+      if (!searchReady && pickupValid && targetValid && timeValid) reasons.push("not-search-ready");
+      return reasons;
+    }
+
+    function clearDriverLiveState(driverKey, reason = "unknown") {
+      if (!driverKey) return false;
+      let changed = false;
+      if (positions.delete(driverKey)) changed = true;
+      if (routePoints.delete(driverKey)) changed = true;
+      if (driverSignalTs.delete(driverKey)) changed = true;
+      if (paxMatchedKeys.delete(driverKey)) changed = true;
+      if (changed) logMapPath("driver-live-state-cleared", { driverKey, reason });
+      return changed;
+    }
+
+    function removeOrphanedDriverPosition(driverKey, reason) {
+      if (!driverKey) return false;
+      if (hasRunningRideForDriver(driverKey)) {
+        logMapPath("driver-live-state-kept", { driverKey, reason, reasonKept: "running-ride" });
+        return false;
+      }
+      return clearDriverLiveState(driverKey, reason);
     }
 
     function getActiveDriverCount() {
@@ -2593,7 +2698,18 @@
       if (btnMarkerClear) btnMarkerClear.hidden = !pickupUi.mapClearVisible;
 
       // Such-Button folgt der Produktregel: Abholpunkt + Ziel + gueltige Startzeit
-      if (searchBtn) searchBtn.disabled = paxSearchActive || onCooldown || pickupEditPending || targetEditPending || !isPaxSearchReady();
+      const searchReady = isPaxSearchReady();
+      const timeValid = isPaxDesiredTimeUsable();
+      const searchBtnDisabledReasons = getPaxSearchButtonDisabledReasons({
+        onCooldown,
+        pickupEditPending,
+        targetEditPending,
+        searchReady,
+        pickupValid: hasMarker,
+        targetValid: hasTarget,
+        timeValid
+      });
+      if (searchBtn) searchBtn.disabled = searchBtnDisabledReasons.length > 0;
       if (cancelBtn) cancelBtn.classList.toggle("show", paxSearchActive);
 
       // Draggability beider Marker synchron halten
@@ -2945,9 +3061,10 @@
     }
 
     function runPaxSearch() {
+      const inputLocked = isPaxInputLocked();
       if (!map || paxLat === null || paxLng === null) return;
       if (paxTargetLat === null || paxTargetLng === null) return;
-      if (isPaxInputLocked()) return;
+      if (inputLocked) return;
       if (!commitPaxTimeInput(true)) return;
 
       if (isPaxRateLimited()) {
@@ -2970,7 +3087,9 @@
         const candidates = [];
         for (const [driverKey, pos] of positions.entries()) {
           if (endedDrivers.has(driverKey)) continue;
-          if (now - (pos.ts || 0) > RIDE_FRESH_MS) continue;
+          if (!hasPublicRideForDriver(driverKey)) continue;
+          const ageMs = now - (pos.ts || 0);
+          if (ageMs > RIDE_FRESH_MS) continue;
           const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
           if (distKm > radiusKm) continue;
           if (!driverHeadsTowardTarget(driverKey)) continue;
@@ -2989,11 +3108,13 @@
 
       paxSearchActive = true;
       refreshPaxMatchLayer();
+      let statusEl = null;
+      let listEl = null;
       updatePaxUI();
       updatePanelSearchStatus();
 
       // Status-Zeile
-      const statusEl = document.getElementById("paxMatchStatus");
+      statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) {
         if (hits.length > 0) {
           statusEl.textContent = `${hits.length} Fahrer gefunden (${foundAtKm} km Umkreis) ✅`;
@@ -3005,7 +3126,7 @@
       }
 
       // Trefferliste rendern
-      const listEl = document.getElementById("paxResultList");
+      listEl = document.getElementById("paxResultList");
       if (listEl) {
         listEl.innerHTML = "";
         if (hits.length > 0) {
@@ -3014,9 +3135,29 @@
             const distText = distKm < 1
               ? `${Math.round(distKm * 1000)} m`
               : `${distKm.toFixed(1)} km`;
+            const ride = getPublicRideForDriver(driverKey);
+            const seats = Number(ride?.plaetze);
+            const seatText = Number.isFinite(seats) && seats > 0 ? `${seats} Platz/Plätze` : null;
+            const priceText = formatSeatPrice(ride?.preis);
             const item = document.createElement("div");
             item.className = "pax-result-item";
-            item.innerHTML = `<span class="pax-result-name">${pos.driver_id ?? driverKey}</span><span class="pax-result-dist">${distText}</span>`;
+            const name = document.createElement("div");
+            name.className = "pax-result-name";
+            name.textContent = ride?.fahrer_name || pos.driver_id || driverKey;
+            const meta = document.createElement("div");
+            meta.className = "pax-result-meta";
+            [distText, seatText, priceText].filter(Boolean).forEach((text) => {
+              const pill = document.createElement("span");
+              pill.className = "pax-result-pill";
+              pill.textContent = text;
+              meta.appendChild(pill);
+            });
+            const cta = document.createElement("span");
+            cta.className = "pax-result-cta";
+            cta.textContent = "Fahrt ansehen";
+            item.appendChild(name);
+            item.appendChild(meta);
+            item.appendChild(cta);
             const snapLng = pos.lng;
             const snapLat = pos.lat;
             item.addEventListener("click", () => {
@@ -3049,7 +3190,8 @@
 
     // Highlight-Layer auf der Karte aktualisieren
     function refreshPaxMatchLayer() {
-      if (!map || !map.getSource(PAX_MATCH_SOURCE)) return;
+      const source = map?.getSource?.(PAX_MATCH_SOURCE);
+      if (!map || !source) return;
       const features = [];
       if (paxSearchActive) {
         for (const [driverKey, pos] of positions.entries()) {
@@ -3061,7 +3203,7 @@
           });
         }
       }
-      map.getSource(PAX_MATCH_SOURCE).setData({ type: "FeatureCollection", features });
+      source.setData({ type: "FeatureCollection", features });
     }
 
     // Such-Buttons
@@ -3081,6 +3223,24 @@
       return String(cutoffOverride);
     }
     function normId(v) { return String(v ?? "").trim().toLowerCase(); }
+    function setPanelStatusText(text) {
+      const status = document.getElementById("panelStatusText");
+      if (status) status.textContent = text || "";
+    }
+    function setPanelIdleTitle() {
+      const status = document.getElementById("panelStatusText");
+      if (!status) return;
+      status.textContent = "EcoRide";
+    }
+    function updatePanelSearchStatus() {
+      if (!paxSearchActive) {
+        setPanelIdleTitle();
+      } else if (paxMatchedKeys.size > 0) {
+        setPanelStatusText("Fahrer gefunden");
+      } else {
+        setPanelStatusText("Fahrer werden gesucht");
+      }
+    }
     function getColorForDriver(driverKey) {
       let hash = 0;
       for (let i = 0; i < driverKey.length; i++) hash = driverKey.charCodeAt(i) + ((hash << 5) - hash);
@@ -3293,7 +3453,7 @@
       map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","#22c55e"],"circle-stroke-color":"rgba(11,15,20,0.18)","circle-stroke-width":1,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.98]}});
       map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":"#60a5fa","circle-stroke-width":3,"circle-opacity":0.92}});
     }
-    function refreshDriversSource() {
+    function refreshDriversSource(reason = "unknown") {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
       const feats = [];
       const now = Date.now();
@@ -3309,6 +3469,10 @@
         }
         if (currentFilterKey && driverKey !== currentFilterKey) {
           logMapPath("refreshDriversSource:skip", { driverKey, reason: "filter-mismatch", currentFilterKey });
+          continue;
+        }
+        if (!hasPublicRideForDriver(driverKey)) {
+          logMapPath("refreshDriversSource:skip", { driverKey, reason: "without-public-ride" });
           continue;
         }
         // Bug 3: Aktive-Modus = nur Fahrer mit aktiver Fahrt in activeRides
@@ -3335,7 +3499,7 @@
       }
       applyDefaultDriverLayerFilters();
       logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length, sourceFeatureCountBefore: getDriverSourceFeatureCount() });
-      map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: feats });
+      setDriversSourceData({ type: "FeatureCollection", features: feats });
       logMapPath("refreshDriversSource:after-setData", { markerFeatures: feats.length, sourceFeatureCountAfter: getDriverSourceFeatureCount() });
       updateSelectedLayerFilter();
       setCount(feats.length);
@@ -3514,7 +3678,7 @@
           routeShown = showDriverRouteOnMap(driverKey, fallbackRouteCoords) || routeShown;
         }
 
-        refreshDriversSource();
+        refreshDriversSource("marker-popup-route");
         onVisibilityOrPanelChange();
       });
       const coords = feature.geometry?.coordinates;
@@ -3560,7 +3724,7 @@
       // Details
       const details = document.createElement("div");
       details.className = "er-pop-details";
-      details.innerHTML = `<span>💺 ${plaetze} Platz/Plätze</span><span>💶 ${preis.toFixed(2)} €</span>`;
+      details.innerHTML = `<span>💺 ${plaetze} Platz/Plätze</span><span>💶 ${formatSeatPrice(preis) || "Preis offen"}</span>`;
       root.appendChild(details);
 
       // Trennlinie
@@ -3734,7 +3898,7 @@
         clearSelection();
         if (map?.getSource?.(DRIVERS_SOURCE)) {
           logMapPath("rideEnd:driver-source-before-empty", { sourceFeatureCountBefore: getDriverSourceFeatureCount() });
-          map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
+          setDriversSourceData({ type: "FeatureCollection", features: [] });
           logMapPath("rideEnd:driver-source-after-empty", { sourceFeatureCountAfter: getDriverSourceFeatureCount() });
         }
         if (map?.getSource?.(RIDES_ROUTE_SOURCE)) {
@@ -3745,7 +3909,7 @@
         }
         snapshotMapState("rideEnd:after-source-set", driverKey);
         rebuildDriverRenderPathEmpty();
-        refreshDriversSource();
+        refreshDriversSource("rideEnd:after-rebuild");
         refreshRoutesSource();
         refreshRidesSource();
         map?.triggerRepaint?.();
@@ -3844,7 +4008,7 @@
       m.on("load", () => {
         hideHint();
         initMapboxLayers(m);
-        refreshDriversSource();
+        refreshDriversSource("map-load");
         refreshRoutesSource();
         refreshRidesSource();
       });
@@ -3876,7 +4040,16 @@
         if (error) { logError("ERR_FETCH_LATEST_FOLLOW_V", error.message); showHint("Fehler beim Laden."); return; }
         logMapPath("fetchLatest:rows(filter)", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
         const row = data?.[0] ?? null;
-        if (!row) { logMapPath("fetchLatest:skip(filter)", { reason: "no-row" }); showHint("Kein frisches Signal für diesen Fahrer."); refreshDriversSource(); refreshRidesSource(); return; }
+        if (!row) {
+          const driverKey = normId(idExact);
+          removeOrphanedDriverPosition(driverKey, "fetchLatest-filter-no-remote-row");
+          logMapPath("fetchLatest:skip(filter)", { reason: "no-row" });
+          showHint("Kein frisches Signal für diesen Fahrer.");
+          refreshDriversSource("fetchLatest-filter-no-row");
+          refreshRoutesSource();
+          refreshRidesSource();
+          return;
+        }
         const rawId = (row.driver_id ?? "").toString();
         const driverKey = normId(rawId);
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
@@ -3885,8 +4058,8 @@
           const endedAt = endedDriverAt.get(driverKey) || 0;
           if (ts <= endedAt + 20_000) {
             logMapPath("fetchLatest:skip(filter)", { reason: "ended-driver", driverKey, ts, endedAt, guardMs: 20000 });
-            positions.delete(driverKey);
-            refreshDriversSource();
+            clearDriverLiveState(driverKey, "fetchLatest-filter-ended-driver");
+            refreshDriversSource("fetchLatest-filter-ended-driver");
             refreshRidesSource();
             return;
           }
@@ -3898,12 +4071,19 @@
         if (!isValidLatLng(lat, lng)) { logMapPath("fetchLatest:skip(filter)", { reason: "invalid-lat-lng", driverKey, lat, lng }); return; }
         const nowMs = Date.now();
         const ageMs = nowMs - ts;
-        if (ageMs > RIDE_FRESH_MS) { logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS }); refreshDriversSource(); refreshRidesSource(); return; }
+        if (ageMs > RIDE_FRESH_MS) {
+          removeOrphanedDriverPosition(driverKey, "fetchLatest-filter-stale-remote-row");
+          logMapPath("fetchLatest:skip(filter)", { reason: "stale-position", driverKey, updated_at: row.updated_at, nowMs, ts, ageMs, threshold: RIDE_FRESH_MS });
+          refreshDriversSource("fetchLatest-filter-stale");
+          refreshRoutesSource();
+          refreshRidesSource();
+          return;
+        }
         positions.clear();
         positions.set(driverKey, { rawId, lng, lat, ts });
         logMapPath("fetchLatest:set(filter)", { driverKey, rawId, lat, lng, updated_at: row.updated_at, positionsSize: positions.size, ageMs });
         map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
-        setLast(new Date()); refreshDriversSource(); refreshRidesSource();
+        setLast(new Date()); refreshDriversSource("fetchLatest-filter-set"); refreshRidesSource();
         return;
       }
 
@@ -3914,10 +4094,12 @@
       if (error) { logError("ERR_FETCH_LATEST_BBOX_V", error.message); showHint("Fehler beim Laden."); return; }
       logMapPath("fetchLatest:rows", (data || []).map(r => ({ driver_id: r?.driver_id, lat: r?.lat, lng: r?.lng, updated_at: r?.updated_at })));
       const nextPositions = new Map();
+      const remoteDriverKeys = new Set();
       for (const row of data || []) {
         const rawId = (row?.driver_id ?? "").toString();
         const key = normId(rawId);
         if (!key) { logMapPath("fetchLatest:skip", { reason: "empty-normalized-driverKey", rawId }); continue; }
+        remoteDriverKeys.add(key);
         const ts = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
         rememberDriverSignal(key, ts);
         if (endedDrivers.has(key)) {
@@ -3940,13 +4122,16 @@
       }
       for (const [key, pos] of positions.entries()) {
         if (nextPositions.has(key)) continue;
-        if ([...activeRides.values()].some((ride) => normId(ride.driver_id) === key)) {
+        if (!remoteDriverKeys.has(key) && hasRunningRideForDriver(key)) {
           nextPositions.set(key, pos);
+          logMapPath("fetchLatest:preserve-running-ride-position", { driverKey: key });
+          continue;
         }
+        if (!remoteDriverKeys.has(key)) clearDriverLiveState(key, "fetchLatest-remote-sync-missing");
       }
       positions.clear();
       for (const [key, pos] of nextPositions.entries()) positions.set(key, pos);
-      setLast(new Date()); refreshDriversSource(); refreshRidesSource();
+      setLast(new Date()); refreshDriversSource("fetchLatest-set"); refreshRidesSource();
     }
 
     // ─────────────────────────────────────────────────
@@ -4035,7 +4220,7 @@
         const rawId = (row.driver_id ?? "").toString();
         positions.set(driverKey, { rawId, lng, lat, ts });
         logDebug("fetchPositionWithRetry: Position gesetzt (Versuch", i + 1, "):", driverKey);
-        refreshDriversSource();
+        refreshDriversSource("fetchPositionWithRetry");
         return;
       }
       logDebug("fetchPositionWithRetry: kein Ergebnis nach", attempts, "Versuchen für", driverKey);
@@ -4139,7 +4324,7 @@
           activeRidesSize: activeRides.size,
           sourceFeatureCountBefore: getDriverSourceFeatureCount()
         });
-        map.getSource(DRIVERS_SOURCE).setData({ type: "FeatureCollection", features: [] });
+        setDriversSourceData({ type: "FeatureCollection", features: [] });
         hideAllDriverLayersImmediately();
         markerChanged = true;
       }
@@ -4150,7 +4335,7 @@
           activeRidesSize: activeRides.size,
           sourceFeatureCountBefore: getDriverSourceFeatureCount()
         });
-        refreshDriversSource();
+        refreshDriversSource("fetchActiveRides:markerChanged");
         refreshRoutesSource();
         logMapPath("fetchActiveRides:driver-render-refresh:done", {
           positionsSize: positions.size,
@@ -4159,6 +4344,7 @@
         });
       }
 
+      refreshDriversSource("fetchActiveRides:end");
       refreshRidesSource();
     }
 
@@ -4175,18 +4361,25 @@
           if (payload?.eventType === "INSERT" || payload?.eventType === "UPDATE") {
             upsertRealtime(payload.new);
           } else if (payload?.eventType === "DELETE") {
-            const key = normId(payload.old?.driver_id);
+            const key = normId(payload.old?.driver_id || payload.old?.id || payload.new?.driver_id || payload.new?.id);
             if (key) {
-              positions.delete(key);
-              routePoints.delete(key);
-              driverSignalTs.delete(key);
+              const endedAt = Date.now();
+              endedDrivers.add(key);
+              endedDriverAt.set(key, endedAt);
+              recentlyEnded.add(key);
+              clearDriverLiveState(key, "live_positions-realtime-delete");
               // Auch zugehörige Rides sofort entfernen → Zielpunkt + Route weg
               for (const [rideId, ride] of activeRides.entries()) {
                 if (normId(ride.driver_id) === key) activeRides.delete(rideId);
               }
-              refreshDriversSource();
+              refreshDriversSource("realtime-delete");
               refreshRoutesSource();
               refreshRidesSource();
+            } else {
+              logMapPath("live_positions-delete-without-driver-key", { old: payload.old || null });
+              fetchLatest()
+                .then(() => fetchActiveRides())
+                .catch(e => logError("ERR_DELETE_RESYNC", e?.message || String(e)));
             }
           }
         })
@@ -4223,7 +4416,7 @@
                 routePoints.delete(driverKey);
               }
               refreshRidesSource();
-              refreshDriversSource();
+              refreshDriversSource("realtime-ride-delete");
               refreshRoutesSource();
               resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
               return;
@@ -4240,7 +4433,7 @@
               driverSignalTs.delete(driverKey);
             }
             refreshRidesSource();
-            refreshDriversSource();
+            refreshDriversSource("realtime-ride-status-ended");
             refreshRoutesSource();
             resetImpactCounters(driverKey); // Aktiv sofort auf 0, driverKey sperren
             return;
@@ -4278,6 +4471,7 @@
                 recentlyEnded.delete(dk);
                 endedDrivers.delete(dk);
                 activeRides.set(id, data);
+                refreshDriversSource("realtime-ride-visible");
                 refreshRidesSource();
                 if (wasBlocked) fetchPositionWithRetry(dk).catch(() => {}); // Position neu laden → Marker
                 logDebug("Ride geladen nach", i, "Retry(s):", id);
@@ -4350,16 +4544,18 @@
       if (arr.length > MAX_POINTS) arr.splice(0, arr.length - MAX_POINTS);
       routePoints.set(driverKey, arr);
 
-      refreshDriversSource(); refreshRoutesSource(); setLast(new Date());
+      refreshDriversSource("upsertRealtime"); refreshRoutesSource(); setLast(new Date());
       const sinceOk = Date.now() - (lastImpactOkAt || 0);
       if (shouldPollImpact() && sinceOk > 3000) fetchImpactOnce().catch(() => {});
     }
 
     const pulseTimer = setInterval(() => {
-      if (!mapReady || mapHidden || !map) return;
-      const hasLiveDriver = [...positions.keys()].some((driverKey) => getDriverRouteState(driverKey) === "active");
+      if (!map || !isTabVisible() || !map.getSource(DRIVERS_SOURCE)) return;
+      const hasLiveDriver = [...positions.keys()].some((driverKey) =>
+        hasPublicRideForDriver(driverKey) && getDriverRouteState(driverKey) === "active"
+      );
       if (!hasLiveDriver) return;
-      refreshDriversSource();
+      refreshDriversSource("pulseTimer");
       map.triggerRepaint?.();
     }, 180);
 
@@ -4379,7 +4575,7 @@
         driversChanged = true;
       }
 
-      if (driversChanged) { refreshDriversSource(); refreshRoutesSource(); refreshRidesSource(); }
+      if (driversChanged) { refreshDriversSource("pruneTimer"); refreshRoutesSource(); refreshRidesSource(); }
     }, PRUNE_EVERY_MS);
 
     // ─────────────────────────────────────────────────
@@ -4422,24 +4618,6 @@
       }
       function getPanelState() {
         return panelState;
-      }
-      function setPanelStatusText(text) {
-        const status = document.getElementById("panelStatusText");
-        if (status) status.textContent = text || "";
-      }
-      function setPanelIdleTitle() {
-        const status = document.getElementById("panelStatusText");
-        if (!status) return;
-        status.textContent = "EcoRide";
-      }
-      function updatePanelSearchStatus() {
-        if (!paxSearchActive) {
-          setPanelIdleTitle();
-        } else if (paxMatchedKeys.size > 0) {
-          setPanelStatusText("Fahrer gefunden");
-        } else {
-          setPanelStatusText("Fahrer werden gesucht");
-        }
       }
       function setPanelState(nextState) {
         const panel = getPanelEl();
@@ -4549,15 +4727,19 @@
 
       document.addEventListener("visibilitychange", () => { onVisibilityOrPanelChange(); });
 
-      const debouncedReload = debounce(async () => {
+      const debouncedReload = debounce(async (source = "unknown") => {
         if (!map || currentFilterKey) return;
         await fetchLatest().catch(() => {});           // erst Positionen
         await fetchActiveRides().catch(() => {});      // dann Rides (filter greift jetzt)
         await fetchRouteHistory().catch(() => {});
       }, BBOX_DEBOUNCE_MS);
 
-      onMoveEnd = debouncedReload;
-      onZoomEnd = debouncedReload;
+      onMoveEnd = () => {
+        debouncedReload("moveend");
+      };
+      onZoomEnd = () => {
+        debouncedReload("zoomend");
+      };
       map.on("moveend", onMoveEnd);
       map.on("zoomend", onZoomEnd);
 
@@ -4625,7 +4807,7 @@
       map.once("style.load", () => {
         routesReady = false;
         initMapboxLayers(map);
-        refreshDriversSource();
+        refreshDriversSource("style-load");
         refreshRoutesSource();
         refreshRidesSource();
       });
@@ -4658,7 +4840,7 @@
         m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":1,"circle-stroke-color":"rgba(11,15,20,0.18)"}});
         m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-width":3,"circle-stroke-color":"#60a5fa","circle-opacity":0.92}});
         m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
-        m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource();onVisibilityOrPanelChange();});
+        m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource("driver-marker-click");onVisibilityOrPanelChange();});
         m.on("mouseenter",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="pointer";});
         m.on("mouseleave",LAYER_CLUSTER_CIRCLE,()=>{m.getCanvas().style.cursor="";});
         m.on("mouseenter",LAYER_POINTS,()=>{m.getCanvas().style.cursor="pointer";});
