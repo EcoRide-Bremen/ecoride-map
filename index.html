@@ -305,6 +305,7 @@
       opacity: 1;
     }
     #paxAccBlock1 .pax-acc-body:not(.pax-closed) { max-height: 340px; }
+    #paxAccBlock2 .pax-acc-body:not(.pax-closed) { max-height: 430px; }
     .pax-acc-body.pax-closed {
       max-height: 0;
       opacity: 0;
@@ -757,6 +758,11 @@
       margin: 8px 0 0;
       padding: 0 16px 4px;
     }
+    .pax-acc-inner > .passenger-hint {
+      margin: -2px 0 0;
+      padding: 0;
+      width: 100%;
+    }
 
     /* ── Mitfahrer: Zeitfeld nach GPS-Client-Prinzip ── */
     .pax-time-inner {
@@ -767,6 +773,19 @@
       gap: 8px;
       padding-top: 2px;
       text-align: center;
+    }
+    .pax-datetime-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+    .pax-date-field,
+    .pax-time-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
     }
     .pax-time-label {
       font-size: 12px;
@@ -793,6 +812,10 @@
       letter-spacing: .04em;
       box-sizing: border-box;
     }
+    .pax-time-input-wrap input[type="date"] {
+      font-size: 15px;
+      letter-spacing: 0;
+    }
     body.theme-light .pax-time-input-wrap input {
       background: rgba(255,255,255,0.82);
       color: #111827;
@@ -802,6 +825,9 @@
       text-align: center;
       font-size: 12px;
       opacity: .62;
+    }
+    @media (max-width: 360px) {
+      .pax-datetime-fields { grid-template-columns: 1fr; }
     }
 
     /* Zielbearbeitung bleibt eine normale Kartenflaeche; Gruen nur als Statussprache. */
@@ -813,6 +839,10 @@
       gap: 8px;
       padding: 10px 16px 4px;
       box-sizing: border-box;
+    }
+    .pax-acc-inner > .pax-search-actions {
+      padding: 6px 0 0;
+      width: 100%;
     }
     .pax-search-btn {
       flex: 1;
@@ -858,26 +888,48 @@
     }
     .pax-cancel-btn.show { display: flex; align-items: center; justify-content: center; }
 
+    /* ── Mitfahrer: Matching-Sektor ── */
+    .pax-matching-sector {
+      display: none;
+      margin: 10px 16px 0;
+      padding: 12px 0 0;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+    .pax-matching-sector.show {
+      display: block;
+    }
+    .pax-matching-title {
+      padding: 0 0 6px;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+    body.theme-light .pax-matching-sector {
+      border-top-color: rgba(15,23,42,0.10);
+    }
+
     /* ── Mitfahrer: Trefferzähler ── */
     .pax-match-status {
       font-size: 12px;
       text-align: center;
-      padding: 4px 10px 2px;
+      padding: 2px 0 8px;
       min-height: 20px;
-      color: rgba(234,240,255,0.70);
+      color: rgba(234,240,255,0.68);
       display: none;
     }
     .pax-match-status.show { display: block; }
-    .pax-match-status.found    { color: #4ade80; }
+    .pax-match-status.found    { color: #111827; font-weight: 500; }
     .pax-match-status.none     { color: rgba(234,240,255,0.45); }
     .pax-match-status.cooldown { color: #fbbf24; }
+    body.theme-light .pax-match-status.found { color: #111827; }
 
     /* ── Trefferliste V1 ── */
     .pax-result-list {
       display: none;
       flex-direction: column;
       gap: 8px;
-      padding: 6px 10px 10px;
+      padding: 0 0 2px;
       box-sizing: border-box;
       max-height: 220px;
       overflow-y: auto;
@@ -885,28 +937,35 @@
     .pax-result-list::-webkit-scrollbar { width: 3px; }
     .pax-result-list::-webkit-scrollbar-thumb { background: rgba(199,223,58,0.25); border-radius: 999px; }
     .pax-result-item {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        "name cta"
-        "meta cta";
-      column-gap: 10px;
-      row-gap: 5px;
-      align-items: center;
-      padding: 10px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 10px 11px 9px;
       border-radius: 8px;
-      background: rgba(17,24,37,0.82);
-      border: 1px solid rgba(199,223,58,0.28);
-      box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+      background: linear-gradient(135deg, rgba(49,46,129,0.88), rgba(30,41,111,0.82));
+      border: 1px solid rgba(129,140,248,0.32);
+      box-shadow: 0 8px 22px rgba(30,41,111,0.22);
       cursor: pointer;
       transition: background .15s, border-color .15s, transform .15s;
       font-size: 12px;
       color: #eaf0ff;
     }
+    .pax-result-item.open {
+      border-color: rgba(129,140,248,0.72);
+      background: linear-gradient(135deg, rgba(55,48,163,0.96), rgba(37,56,139,0.92));
+    }
     .pax-result-item:hover, .pax-result-item:active {
-      background: rgba(24,32,45,0.94);
-      border-color: rgba(199,223,58,0.62);
+      background: linear-gradient(135deg, rgba(55,48,163,0.94), rgba(37,56,139,0.88));
+      border-color: rgba(129,140,248,0.60);
       transform: translateY(-1px);
+    }
+    .pax-result-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "name chevron";
+      column-gap: 8px;
+      align-items: center;
+      min-width: 0;
     }
     .pax-result-name {
       grid-area: name;
@@ -916,6 +975,25 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
+    }
+    .pax-result-chevron {
+      grid-area: chevron;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      background: #4F46E5;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1;
+      transition: transform .15s ease, background .15s ease;
+    }
+    .pax-result-item.open .pax-result-chevron {
+      transform: rotate(180deg);
+      background: #6366F1;
     }
     .pax-result-meta {
       grid-area: meta;
@@ -934,20 +1012,58 @@
       padding: 5px 7px;
       white-space: nowrap;
     }
-    .pax-result-cta {
-      grid-area: cta;
-      align-self: stretch;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 82px;
-      padding: 0 10px;
-      border-radius: 7px;
-      background: #c7df3a;
-      color: #0b0f14;
+    .pax-result-details {
+      display: none;
+      border-top: 1px solid rgba(199,210,254,0.18);
+      padding-top: 8px;
+      gap: 5px;
+      color: rgba(234,240,255,0.82);
       font-size: 11px;
-      font-weight: 800;
-      flex-shrink: 0;
+      line-height: 1.35;
+    }
+    .pax-result-item.open .pax-result-details {
+      display: grid;
+    }
+    .pax-result-detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+    .pax-result-detail-label {
+      opacity: .68;
+      flex: 0 0 auto;
+    }
+    .pax-result-detail-value {
+      font-weight: 700;
+      text-align: right;
+      min-width: 0;
+    }
+    body.theme-light .pax-result-item {
+      background: linear-gradient(135deg, rgba(238,242,255,0.96), rgba(224,231,255,0.92));
+      border-color: rgba(79,70,229,0.24);
+      box-shadow: 0 8px 22px rgba(79,70,229,0.10);
+      color: #111827;
+    }
+    body.theme-light .pax-result-item.open {
+      border-color: rgba(79,70,229,0.42);
+      background: linear-gradient(135deg, rgba(238,242,255,0.98), rgba(199,210,254,0.90));
+    }
+    body.theme-light .pax-result-item:hover,
+    body.theme-light .pax-result-item:active {
+      background: linear-gradient(135deg, rgba(224,231,255,0.98), rgba(199,210,254,0.92));
+      border-color: rgba(79,70,229,0.46);
+    }
+    body.theme-light .pax-result-details {
+      border-top-color: rgba(79,70,229,0.16);
+      color: rgba(17,24,39,0.78);
+    }
+
+    @media (max-width: 360px) {
+      .pax-result-item { padding: 9px 10px 8px; }
+      .pax-result-main { column-gap: 7px; }
+      .pax-result-chevron { width: 26px; height: 26px; }
+      .pax-result-detail-row { gap: 8px; }
     }
 
     .input-button-group {
@@ -1363,29 +1479,40 @@
         <div class="pax-acc-body pax-closed" id="paxTimeBlock">
           <div class="pax-acc-inner">
             <div class="pax-time-inner">
-              <div class="pax-time-label">Startzeit eingeben</div>
-              <div class="pax-time-input-wrap">
-                <input id="paxTimeInput" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" autocomplete="off" />
+              <div class="pax-datetime-fields">
+                <div class="pax-date-field">
+                  <div class="pax-time-label">Datum</div>
+                  <div class="pax-time-input-wrap">
+                    <input id="paxDateInput" type="date" autocomplete="off" />
+                  </div>
+                </div>
+                <div class="pax-time-field">
+                  <div class="pax-time-label">Startzeit eingeben</div>
+                  <div class="pax-time-input-wrap">
+                    <input id="paxTimeInput" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5" autocomplete="off" />
+                  </div>
+                </div>
               </div>
               <div class="pax-time-note">Startzeitfenster für deine Fahrt</div>
             </div>
             <div class="pax-locked-hint" id="paxLockedHint">Suche abbrechen zum Ändern</div>
+            <div class="pax-search-actions" id="paxSearchActions">
+              <button class="pax-search-btn" id="btnPaxSearch">Fahrer finden</button>
+              <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
+            </div>
+            <p class="passenger-hint" id="paxHint">Abholpunkt setzen um Fahrer zu finden.</p>
           </div>
         </div>
       </div>
 
-      <!-- Block 4: Suche starten – sichtbar wenn Abholpunkt + Ziel gesetzt -->
+      <!-- Block 4: Matching – sichtbar nach Suchstatus/Treffern -->
       <div id="paxSearchBlock" style="display:none">
-        <div class="pax-divider"></div>
-        <div class="pax-search-actions">
-          <button class="pax-search-btn" id="btnPaxSearch">Fahrer finden</button>
-          <button class="pax-cancel-btn" id="btnPaxCancel">✕ Abbrechen</button>
-        </div>
-        <div class="pax-match-status" id="paxMatchStatus"></div>
-        <div class="pax-result-list" id="paxResultList"></div>
+        <section class="pax-matching-sector" id="paxMatchingSector" aria-labelledby="paxMatchingTitle">
+          <div class="pax-matching-title" id="paxMatchingTitle">Matching</div>
+          <div class="pax-match-status" id="paxMatchStatus"></div>
+          <div class="pax-result-list" id="paxResultList"></div>
+        </section>
       </div>
-
-      <p class="passenger-hint" id="paxHint">Abholpunkt setzen um Fahrer zu finden.</p>
         </div><!-- /passengerPanel -->
       </div><!-- /panelBody -->
 
@@ -1429,6 +1556,111 @@
       if (!source) return;
       source.setData(data);
     }
+
+    function removeDriverLiveMarker(driverKey) {
+      const marker = driverLiveMarkers.get(driverKey);
+      if (!marker) return false;
+      marker.remove();
+      driverLiveMarkers.delete(driverKey);
+      return true;
+    }
+
+    function clearDriverLiveMarkers() {
+      for (const marker of driverLiveMarkers.values()) marker.remove();
+      driverLiveMarkers.clear();
+    }
+
+    function syncDriverLiveMarkers(features) {
+      if (!map) return;
+      const keep = new Set();
+      for (const feature of features || []) {
+        const props = feature?.properties || {};
+        const driverKey = normId(props.driverKey);
+        const coords = feature?.geometry?.coordinates;
+        if (!driverKey || !Array.isArray(coords) || coords.length < 2) continue;
+        if (Number(props.stale) === 1 || Number(props.isLive) !== 1) {
+          removeDriverLiveMarker(driverKey);
+          continue;
+        }
+        keep.add(driverKey);
+        let marker = driverLiveMarkers.get(driverKey);
+        if (!marker) {
+          marker = new mapboxgl.Marker({ color: DRIVER_PIN_COLOR }).setLngLat(coords).addTo(map);
+          marker.getElement().setAttribute("aria-label", "Fahrerposition");
+          marker.getElement().addEventListener("click", async (event) => {
+            event.stopPropagation();
+            const currentFeature = marker.getElement().__ecoRideFeature;
+            if (!currentFeature) return;
+            map.easeTo({ center: currentFeature.geometry.coordinates, zoom: 14, duration: 650 });
+            openMarkerPopupFromFeature(currentFeature);
+            await fetchLatest().catch(() => {});
+            await fetchRouteHistory().catch(() => {});
+            refreshDriversSource("driver-marker-click");
+            onVisibilityOrPanelChange();
+          });
+          driverLiveMarkers.set(driverKey, marker);
+        }
+        marker.setLngLat(coords);
+        marker.getElement().__ecoRideFeature = feature;
+      }
+      for (const key of [...driverLiveMarkers.keys()]) {
+        if (!keep.has(key)) removeDriverLiveMarker(key);
+      }
+    }
+
+    function hasVisibleLiveDriverPulseCandidate() {
+      if (driverLiveMarkers.size > 0) return true;
+      const sourceFeatures = map?.getSource?.(DRIVERS_SOURCE)?._data?.features;
+      if (Array.isArray(sourceFeatures) && sourceFeatures.some((feature) => Number(feature?.properties?.isLive) === 1)) return true;
+      return [...positions.keys()].some((driverKey) =>
+        hasPublicRideForDriver(driverKey) && getDriverRouteState(driverKey) === "active"
+      );
+    }
+
+    function removeRideDestinationMarker(rideId) {
+      const marker = rideDestinationMarkers.get(rideId);
+      if (!marker) return false;
+      marker.remove();
+      rideDestinationMarkers.delete(rideId);
+      return true;
+    }
+
+    function clearRideDestinationMarkers() {
+      for (const marker of rideDestinationMarkers.values()) marker.remove();
+      rideDestinationMarkers.clear();
+    }
+
+    function syncRideDestinationMarkers(features) {
+      if (!map) return;
+      const keep = new Set();
+      for (const feature of features || []) {
+        const props = feature?.properties || {};
+        const rideId = String(props.rideId || "");
+        const coords = feature?.geometry?.coordinates;
+        if (!rideId || !Array.isArray(coords) || coords.length < 2) continue;
+        keep.add(rideId);
+        let marker = rideDestinationMarkers.get(rideId);
+        if (!marker) {
+          marker = new mapboxgl.Marker({ color: DRIVER_DEST_PIN_COLOR }).setLngLat(coords).addTo(map);
+          marker.getElement().setAttribute("aria-label", "Fahrerziel");
+          marker.getElement().addEventListener("click", (event) => {
+            event.stopPropagation();
+            const currentFeature = marker.getElement().__ecoRideFeature;
+            if (!currentFeature) return;
+            map.easeTo({ center: currentFeature.geometry.coordinates, zoom: 14, duration: 550 });
+            openRidePopup(currentFeature);
+          });
+          rideDestinationMarkers.set(rideId, marker);
+        }
+        marker.setLngLat(coords);
+        marker.getElement().__ecoRideFeature = feature;
+        marker.getElement().style.opacity = Number(props.stale) === 1 ? "0.65" : "";
+      }
+      for (const rideId of [...rideDestinationMarkers.keys()]) {
+        if (!keep.has(rideId)) removeRideDestinationMarker(rideId);
+      }
+    }
+
     function logError(code, message, ctx = {}) {
       console.error(`[${code}] ${message}`, { ts: new Date().toISOString(), ...ctx });
     }
@@ -1463,6 +1695,12 @@
     const IMPACT_MIN_MS         = 5_000;
     const IMPACT_MAX_MS         = 60_000;
     const IMPACT_BACKOFF        = [5_000,10_000,20_000,40_000,60_000];
+    const DRIVER_PIN_COLOR      = "#DC2626";
+    const DRIVER_DEST_PIN_COLOR = "#16A34A";
+    const DRIVER_PIN_PULSE_FILL = "rgba(220,38,38,0)";
+    const DRIVER_PIN_PULSE_STROKE = "rgba(220,38,38,0.88)";
+    const DRIVER_PIN_PULSE_STROKE_DARK = "rgba(248,113,113,0.96)";
+    const DRIVER_PIN_PULSE_OPACITY_DARK_MULTIPLIER = 1.45;
 
     // Driver source/layers (bestehend)
     const DRIVERS_SOURCE        = "er-drivers";
@@ -1482,6 +1720,9 @@
     // NEU: Mitfahrer-Suche: Highlight-Layer
     const PAX_MATCH_SOURCE      = "er-pax-match";
     const LAYER_PAX_MATCH       = "er-pax-match-ring";
+
+    const driverLiveMarkers = new Map();
+    const rideDestinationMarkers = new Map();
 
     // Matching-Konstanten
     const PAX_MATCH_RADII_KM    = [2, 4, 6, 8, 10]; // Eskalierender Radius V1
@@ -1510,6 +1751,55 @@
       dark: "mapbox://styles/mapbox/dark-v11",
       light: "mapbox://styles/mapbox/streets-v12"
     };
+
+    function getDriverPinPulseStrokeColor() {
+      return currentTheme === "dark" ? DRIVER_PIN_PULSE_STROKE_DARK : DRIVER_PIN_PULSE_STROKE;
+    }
+
+    function getDriverPinPulseOpacityPaint() {
+      return currentTheme === "dark"
+        ? ["*", ["get","pulseOpacity"], DRIVER_PIN_PULSE_OPACITY_DARK_MULTIPLIER]
+        : ["get","pulseOpacity"];
+    }
+
+    function getDriverPinPulseFrame(now = Date.now()) {
+      const pulsePhase = ((now % 1200) / 1200);
+      const pulseOpacity = 0.22 + (0.22 * (1 - pulsePhase));
+      const opacity = currentTheme === "dark"
+        ? pulseOpacity * DRIVER_PIN_PULSE_OPACITY_DARK_MULTIPLIER
+        : pulseOpacity;
+      return {
+        radius: 9.2 + (pulsePhase * 1.6),
+        strokeWidth: 1.1 + ((1 - pulsePhase) * 0.9),
+        opacity,
+      };
+    }
+
+    function getDriverPinPulsePaint(now = Date.now()) {
+      const frame = getDriverPinPulseFrame(now);
+      return {
+        "circle-radius": frame.radius,
+        "circle-color": DRIVER_PIN_PULSE_FILL,
+        "circle-stroke-color": getDriverPinPulseStrokeColor(),
+        "circle-stroke-width": frame.strokeWidth,
+        "circle-opacity": frame.opacity,
+      };
+    }
+
+    function keepDriverPinPulseLayerVisible() {
+      if (!map?.getLayer?.(`${LAYER_POINTS}-pulse`)) return;
+      try { map.moveLayer(`${LAYER_POINTS}-pulse`); } catch (_) {}
+    }
+
+    function updateDriverPinPulsePaint(now = Date.now()) {
+      if (!map?.getLayer?.(`${LAYER_POINTS}-pulse`)) return;
+      const frame = getDriverPinPulseFrame(now);
+      map.setPaintProperty(`${LAYER_POINTS}-pulse`, "circle-radius", frame.radius);
+      map.setPaintProperty(`${LAYER_POINTS}-pulse`, "circle-stroke-width", frame.strokeWidth);
+      map.setPaintProperty(`${LAYER_POINTS}-pulse`, "circle-opacity", frame.opacity);
+      map.setPaintProperty(`${LAYER_POINTS}-pulse`, "circle-stroke-color", getDriverPinPulseStrokeColor());
+      keepDriverPinPulseLayerVisible();
+    }
 
     const positions   = new Map();
     const routePoints = new Map();
@@ -1601,6 +1891,7 @@
       if (routePoints.delete(driverKey)) changed = true;
       if (driverSignalTs.delete(driverKey)) changed = true;
       if (paxMatchedKeys.delete(driverKey)) changed = true;
+      if (removeDriverLiveMarker(driverKey)) changed = true;
       if (changed) logMapPath("driver-live-state-cleared", { driverKey, reason });
       return changed;
     }
@@ -1662,6 +1953,8 @@
 
     // NEU: Mitfahrer-Suche State
     const paxMatchedKeys = new Set();  // driverKeys der gematchten Fahrer
+    let paxRideResults = [];
+    let openPaxResultDriverKey = null;
 
     // Zielmarker State
     let paxTargetLat    = null;
@@ -1706,7 +1999,8 @@
     let paxPickupMapLng = null;
     let paxPendingPickupLat = null;
     let paxPendingPickupLng = null;
-    let paxTimeMin     = 0;     // gewähltes Zeitfenster in Minuten (0 = jetzt)
+    let paxTimeMin     = 0;     // gewaehlter Suchzeitpunkt als Minutenabstand zu jetzt
+    let paxDesiredDate = null;  // stabiles sichtbares Datum im Format YYYY-MM-DD
     let paxDesiredTime = null;  // stabile sichtbare Wunschzeit im Format HH:MM
     let paxTimeUserSet = false; // true erst nach bewusst gueltiger Nutzereingabe
     let paxSearchActive = false; // Suche gestartet → Zeitfenster gesperrt
@@ -1762,7 +2056,7 @@
 
     function ensurePaxTargetMarker(lng, lat) {
       if (!paxTargetMarker) {
-        paxTargetMarker = new mapboxgl.Marker({ color: "#4ade80", draggable: isPaxTargetDraggable() })
+        paxTargetMarker = new mapboxgl.Marker({ color: "#F97316", draggable: isPaxTargetDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxTargetMarker.on("dragend", () => {
@@ -1897,7 +2191,7 @@
       paxPendingPickupLng = null;
       // GPS-Verifikation bleibt erhalten – Treffpunkt anpassen hebt Verifikation nicht auf
       if (!paxMarker) {
-        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
+        paxMarker = new mapboxgl.Marker({ color: "#2563EB", draggable: isPaxMarkerDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxMarker.on("dragend", () => {
@@ -1923,7 +2217,7 @@
       paxPendingPickupLng = lng;
       paxPendingPickupLat = lat;
       if (!paxMarker) {
-        paxMarker = new mapboxgl.Marker({ color: "#60a5fa", draggable: isPaxMarkerDraggable() })
+        paxMarker = new mapboxgl.Marker({ color: "#2563EB", draggable: isPaxMarkerDraggable() })
           .setLngLat([lng, lat])
           .addTo(map);
         paxMarker.on("dragend", () => {
@@ -2573,6 +2867,7 @@
       const targetMapChoiceRow = document.getElementById("paxTargetMapChoiceRow");
       const btnTargetClear = document.getElementById("btnPaxTargetClear");
       const searchBlock  = document.getElementById("paxSearchBlock");
+      const searchActions = document.getElementById("paxSearchActions");
       const searchBtn   = document.getElementById("btnPaxSearch");
       const cancelBtn   = document.getElementById("btnPaxCancel");
       if (!statusEl) return;
@@ -2631,6 +2926,9 @@
       if (btnTargetClear) btnTargetClear.hidden = !targetUi.mapClearVisible;
 
       // Suchblock: nur wenn Abholpunkt + Ziel gesetzt
+      if (searchActions) {
+        searchActions.style.display = (hasMarker && hasTarget) ? "flex" : "none";
+      }
       if (searchBlock) {
         searchBlock.style.display = (hasMarker && hasTarget) ? "" : "none";
       }
@@ -2751,8 +3049,8 @@
         b2val.className = "pax-acc-value set";
       }
       if (b2body) {
-        // Offen wenn: Abholpunkt und Ziel gesetzt sind, oder manuell geöffnet.
-        const b2open = hasMarker && ((hasTarget && !paxTimeTouched) || paxTimeOpen);
+        // Offen wenn: Suche vorbereitet ist; Button und Hinweis gehoeren zum Startzeit-Sektor.
+        const b2open = hasMarker && (hasTarget || paxTimeOpen);
         b2body.classList.toggle("pax-closed", !b2open);
       }
       if (b2hdr) b2hdr.classList.toggle("locked", locked);
@@ -2884,14 +3182,38 @@
     });
 
     // ─────────────────────────────────────────────────
-    // ZEITFENSTER: GPS-artiges HH:MM-Feld, intern bleibt paxTimeMin
+    // ZEITFENSTER: Datum + GPS-artiges HH:MM-Feld, intern bleibt paxTimeMin
     // ─────────────────────────────────────────────────
     const PAX_STEP_MIN  = 0;          // fruehester Wert: jetzt
-    const PAX_STEP_MAX  = 23 * 60 + 59; // spaetester Wert: heute 23:59
     const PAX_TIME_PLACEHOLDER = "HH:MM";
 
     function padTimePart(value) {
       return String(value).padStart(2, "0");
+    }
+
+    function formatLocalDateInputValue(date = new Date()) {
+      const y = date.getFullYear();
+      const m = padTimePart(date.getMonth() + 1);
+      const d = padTimePart(date.getDate());
+      return `${y}-${m}-${d}`;
+    }
+
+    function formatPaxDateDisplay(value) {
+      const date = parseLocalDateInputValue(value);
+      if (!date) return "";
+      return `${padTimePart(date.getDate())}.${padTimePart(date.getMonth() + 1)}.${date.getFullYear()}`;
+    }
+
+    function parseLocalDateInputValue(value) {
+      const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      const y = Number(match[1]);
+      const m = Number(match[2]);
+      const d = Number(match[3]);
+      const date = new Date(y, m - 1, d);
+      if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+      date.setHours(0, 0, 0, 0);
+      return date;
     }
 
     function formatTimeOfDay(date) {
@@ -2899,66 +3221,144 @@
     }
 
     function formatPaxTimeFromMinutes(min, now = new Date()) {
-      const safeMin = Math.max(PAX_STEP_MIN, Math.min(PAX_STEP_MAX, Number(min) || 0));
+      const safeMin = Math.max(PAX_STEP_MIN, Number(min) || 0);
       return formatTimeOfDay(new Date(now.getTime() + safeMin * 60_000));
     }
 
     function getPaxVisibleTime() {
-      return paxTimeUserSet && paxDesiredTime ? paxDesiredTime : PAX_TIME_PLACEHOLDER;
+      const datePart = formatPaxDateDisplay(paxDesiredDate || formatLocalDateInputValue(new Date()));
+      const timePart = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : PAX_TIME_PLACEHOLDER;
+      return datePart ? `${datePart} · ${timePart}` : timePart;
     }
 
-    function getMinutesUntilClockTime(value, now = new Date()) {
-      const match = value.match(/^(\d{2}):(\d{2})$/);
+    function parseClockTime(value) {
+      const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
       if (!match) return null;
       const h = Number(match[1]);
       const m = Number(match[2]);
       if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+      return { h, m };
+    }
 
+    function parseLocalPaxDateTime(dateValue, timeValue) {
+      const date = parseLocalDateInputValue(dateValue);
+      const time = parseClockTime(timeValue);
+      if (!date || !time) return null;
+      const dt = new Date(date);
+      dt.setHours(time.h, time.m, 0, 0);
+      return dt;
+    }
+
+    function getPaxEffectiveDateValue(now = new Date()) {
+      return paxDesiredDate || formatLocalDateInputValue(now);
+    }
+
+    function getPaxEffectiveTimeValue(now = new Date()) {
+      return paxTimeUserSet && paxDesiredTime ? paxDesiredTime : formatTimeOfDay(now);
+    }
+
+    function getMinutesUntilPaxDateTime(dateValue, timeValue, now = new Date()) {
+      const target = parseLocalPaxDateTime(dateValue, timeValue);
+      if (!target) return null;
       const base = new Date(now);
       base.setSeconds(0, 0);
-      const target = new Date(base);
-      target.setHours(h, m, 0, 0);
-      let diffMin = Math.round((target.getTime() - base.getTime()) / 60_000);
+      const diffMin = Math.round((target.getTime() - base.getTime()) / 60_000);
       if (diffMin < 0) return null;
       return diffMin;
     }
 
+    function getMinutesUntilClockTime(value, now = new Date()) {
+      return getMinutesUntilPaxDateTime(formatLocalDateInputValue(now), value, now);
+    }
+
+    function getPaxSearchDateTimeMs(now = new Date()) {
+      const dt = parseLocalPaxDateTime(getPaxEffectiveDateValue(now), getPaxEffectiveTimeValue(now));
+      return dt ? dt.getTime() : null;
+    }
+
+    function getRideDepartureTimeMs(ride) {
+      if (!ride?.departure_time) return null;
+      const ms = Date.parse(ride.departure_time);
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    function isRideWithinPaxTimeWindow(ride, paxSearchMs) {
+      if (!Number.isFinite(paxSearchMs)) return false;
+      const rideMs = getRideDepartureTimeMs(ride);
+      if (!Number.isFinite(rideMs)) return false;
+      return Math.abs(rideMs - paxSearchMs) <= PAX_MATCH_TIME_SLACK * 60_000;
+    }
+
+    function ensurePaxDateInputDefault(now = new Date()) {
+      const input = document.getElementById("paxDateInput");
+      const today = formatLocalDateInputValue(now);
+      if (input) {
+        input.min = today;
+        if (!input.value) input.value = paxDesiredDate || today;
+      }
+      if (!paxDesiredDate) paxDesiredDate = input?.value || today;
+      return paxDesiredDate;
+    }
+
     function isPaxDesiredTimeUsable() {
-      if (!paxTimeUserSet) return true;
-      const min = getMinutesUntilClockTime(paxDesiredTime || "");
-      return min !== null && min >= PAX_STEP_MIN && min <= PAX_STEP_MAX;
+      const now = new Date();
+      const dateValue = paxDesiredDate || formatLocalDateInputValue(now);
+      const date = parseLocalDateInputValue(dateValue);
+      const today = parseLocalDateInputValue(formatLocalDateInputValue(now));
+      if (!date || (today && date.getTime() < today.getTime())) return false;
+      const min = getMinutesUntilPaxDateTime(dateValue, getPaxEffectiveTimeValue(now), now);
+      return min !== null && min >= PAX_STEP_MIN;
     }
 
     function syncPaxTimeInputUI() {
+      const dateInput = document.getElementById("paxDateInput");
       const input = document.getElementById("paxTimeInput");
+      const locked = paxSearchActive || isPaxInputLocked();
+      const dateValue = ensurePaxDateInputDefault();
+      if (dateInput) {
+        dateInput.disabled = locked;
+        dateInput.value = dateValue;
+      }
       if (!input) return;
-      input.disabled = paxSearchActive || isPaxInputLocked();
+      input.disabled = locked;
       if (document.activeElement !== input) {
         input.value = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : "";
       }
     }
 
     function commitPaxTimeInput(showMessage = true) {
+      const dateInput = document.getElementById("paxDateInput");
       const input = document.getElementById("paxTimeInput");
-      if (!paxTimeUserSet) {
-        paxTimeMin = 0;
+      const now = new Date();
+      const today = formatLocalDateInputValue(now);
+      if (dateInput) {
+        dateInput.min = today;
+        if (!dateInput.value) dateInput.value = paxDesiredDate || today;
+      }
+      const rawDate = (dateInput?.value || paxDesiredDate || today).trim();
+      const parsedDate = parseLocalDateInputValue(rawDate);
+      const todayDate = parseLocalDateInputValue(today);
+      if (!parsedDate || (todayDate && parsedDate.getTime() < todayDate.getTime())) {
+        if (dateInput) dateInput.value = paxDesiredDate || today;
+        updatePaxUI();
+        if (showMessage) showHint("Bitte gültiges Datum und eine zukünftige Startzeit wählen.");
+        return false;
+      }
+      paxDesiredDate = rawDate;
+
+      const rawValue = (input?.value || paxDesiredTime || "").trim();
+      if (!rawValue && !paxTimeUserSet) {
+        paxTimeMin = getMinutesUntilPaxDateTime(paxDesiredDate, getPaxEffectiveTimeValue(now), now) || 0;
         if (input) input.value = "";
+        updatePaxUI();
         return true;
       }
-      const rawValue = (input?.value || paxDesiredTime || "").trim();
-      const nextMin = getMinutesUntilClockTime(rawValue);
+      const nextMin = getMinutesUntilPaxDateTime(paxDesiredDate, rawValue, now);
       if (nextMin === null) {
         if (!paxDesiredTime) paxTimeUserSet = false;
         if (input) input.value = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : "";
         updatePaxUI();
-        if (showMessage) showHint("Bitte Uhrzeit als HH:MM eingeben.");
-        return false;
-      }
-      if (nextMin < PAX_STEP_MIN || nextMin > PAX_STEP_MAX) {
-        paxDesiredTime = rawValue;
-        paxTimeUserSet = true;
-        updatePaxUI();
-        if (showMessage) showHint("Bitte eine noch bevorstehende Startzeit wählen.");
+        if (showMessage) showHint("Bitte gültiges Datum und eine zukünftige Startzeit wählen.");
         return false;
       }
       paxDesiredTime = rawValue;
@@ -2967,6 +3367,14 @@
       if (input) input.value = paxDesiredTime;
       updatePaxUI();
       return true;
+    }
+
+    const paxDateInput = document.getElementById("paxDateInput");
+    if (paxDateInput) {
+      ensurePaxDateInputDefault();
+      paxDateInput.addEventListener("input", () => commitPaxTimeInput(false));
+      paxDateInput.addEventListener("change", () => commitPaxTimeInput(true));
+      paxDateInput.addEventListener("blur", () => commitPaxTimeInput(true));
     }
 
     const paxTimeInput = document.getElementById("paxTimeInput");
@@ -2983,8 +3391,10 @@
       });
       paxTimeInput.addEventListener("blur", () => {
         if (!/^\d{2}:\d{2}$/.test(paxTimeInput.value)) {
+          const hadValue = !!paxTimeInput.value.trim();
           paxTimeInput.value = paxTimeUserSet && paxDesiredTime ? paxDesiredTime : "";
           updatePaxUI();
+          if (hadValue) showHint("Bitte gültiges Datum und eine zukünftige Startzeit wählen.");
           return;
         }
         paxTimeUserSet = true;
@@ -3039,11 +3449,13 @@
           if (statusEl && statusEl.classList.contains("cooldown")) {
             statusEl.className = "pax-match-status";
             statusEl.textContent = "";
+            updatePaxMatchingSector();
           }
         } else {
           if (statusEl) {
             statusEl.textContent = `Bitte kurz warten… noch ${remaining}s`;
             statusEl.className = "pax-match-status show cooldown";
+            updatePaxMatchingSector();
           }
           updatePaxUI(); // Button+Zeitfenster gesperrt halten
         }
@@ -3060,12 +3472,190 @@
       return paxStartTimes.length >= PAX_MAX_STARTS;
     }
 
+    function findPublicRideEntryForDriver(driverKey) {
+      if (!driverKey) return null;
+      return [...activeRides.entries()].find(([, ride]) => {
+        if (normId(ride?.driver_id) !== driverKey) return false;
+        return ["angeboten", "aktiv"].includes(ride?.status || "aktiv");
+      }) || null;
+    }
+
+    function formatRideStatusLabel(status) {
+      return status === "angeboten" ? "angeboten" : "aktiv";
+    }
+
+    function formatRideDepartureTime(value) {
+      if (!value) return null;
+      const dt = new Date(value);
+      if (!Number.isFinite(dt.getTime())) return null;
+      return formatTimeOfDay(dt);
+    }
+
+    function buildPaxRideResult(hit, foundAtKm) {
+      const driverKey = hit?.driverKey;
+      const pos = hit?.pos || {};
+      const rideEntry = findPublicRideEntryForDriver(driverKey);
+      const rideId = rideEntry?.[0] || null;
+      const ride = rideEntry?.[1] || null;
+      const distKm = Number(hit?.distKm);
+      const distText = Number.isFinite(distKm)
+        ? (distKm < 1 ? `${Math.round(distKm * 1000)} m zum Treffpunkt` : `${distKm.toFixed(1)} km zum Treffpunkt`)
+        : null;
+      const seats = Number(ride?.plaetze);
+      const seatText = Number.isFinite(seats) && seats > 0 ? `${seats} Platz/Plätze frei` : null;
+      const priceText = formatSeatPrice(ride?.preis);
+      const routeState = getDriverRouteState(driverKey);
+      const status = ride?.status || "aktiv";
+      const zLat = Number(ride?.ziel_lat);
+      const zLng = Number(ride?.ziel_lng);
+      return {
+        driverKey,
+        rideId,
+        ride,
+        pos,
+        driverName: ride?.fahrer_name || pos.rawId || driverKey,
+        distanceKm: distKm,
+        distanceText: distText,
+        seats,
+        seatText,
+        priceText,
+        status,
+        statusText: formatRideStatusLabel(status),
+        departureText: formatRideDepartureTime(ride?.departure_time),
+        hasDestination: isValidLatLng(zLat, zLng),
+        routeState,
+        liveText: routeState === "active" ? "Live-Position aktiv" : routeState === "stale" ? "Signal älter" : null,
+        foundAtKm,
+        focusLngLat: [Number(pos.lng), Number(pos.lat)],
+      };
+    }
+
+    function makePaxResultPill(text) {
+      const pill = document.createElement("span");
+      pill.className = "pax-result-pill";
+      pill.textContent = text;
+      return pill;
+    }
+
+    function appendPaxResultDetail(root, label, value) {
+      if (!value) return;
+      const row = document.createElement("div");
+      row.className = "pax-result-detail-row";
+      const labelEl = document.createElement("span");
+      labelEl.className = "pax-result-detail-label";
+      labelEl.textContent = label;
+      const valueEl = document.createElement("span");
+      valueEl.className = "pax-result-detail-value";
+      valueEl.textContent = value;
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      root.appendChild(row);
+    }
+
+    function selectPaxResult(driverKey) {
+      const result = paxRideResults.find(item => item.driverKey === driverKey);
+      const coords = result?.focusLngLat;
+      if (!map || !Array.isArray(coords) || coords.length !== 2) return;
+      const [lng, lat] = coords;
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+      map.easeTo({ center: [lng, lat], zoom: 15, duration: 500 });
+    }
+
+    function togglePaxResultDetails(driverKey) {
+      openPaxResultDriverKey = openPaxResultDriverKey === driverKey ? null : driverKey;
+      renderPaxResults(paxRideResults);
+    }
+
+    function clearPaxResults() {
+      paxRideResults = [];
+      openPaxResultDriverKey = null;
+      const listEl = document.getElementById("paxResultList");
+      if (listEl) { listEl.innerHTML = ""; listEl.style.display = "none"; }
+      updatePaxMatchingSector();
+    }
+
+    function updatePaxMatchingSector() {
+      const sectorEl = document.getElementById("paxMatchingSector");
+      if (!sectorEl) return;
+      const statusEl = document.getElementById("paxMatchStatus");
+      const listEl = document.getElementById("paxResultList");
+      const hasStatus = !!statusEl?.classList.contains("show") && !!statusEl.textContent.trim();
+      const hasResults = listEl?.style.display === "flex" && listEl.children.length > 0;
+      sectorEl.classList.toggle("show", hasStatus || hasResults);
+    }
+
+    function renderPaxResults(results) {
+      const listEl = document.getElementById("paxResultList");
+      if (!listEl) return;
+      listEl.innerHTML = "";
+      if (!Array.isArray(results) || results.length === 0) {
+        listEl.style.display = "none";
+        updatePaxMatchingSector();
+        return;
+      }
+      listEl.style.display = "flex";
+      for (const result of results) {
+        const isOpen = result.driverKey === openPaxResultDriverKey;
+        const item = document.createElement("div");
+        item.className = "pax-result-item" + (isOpen ? " open" : "");
+        item.dataset.driverKey = result.driverKey;
+        item.setAttribute("role", "button");
+        item.setAttribute("tabindex", "0");
+        item.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
+        const main = document.createElement("div");
+        main.className = "pax-result-main";
+
+        const name = document.createElement("div");
+        name.className = "pax-result-name";
+        name.textContent = result.driverName || result.driverKey;
+
+        const chevron = document.createElement("span");
+        chevron.className = "pax-result-chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "⌄";
+
+        main.appendChild(name);
+        main.appendChild(chevron);
+        item.appendChild(main);
+
+        const details = document.createElement("div");
+        details.className = "pax-result-details";
+        appendPaxResultDetail(details, "Status", result.statusText);
+        appendPaxResultDetail(details, "Abfahrt", result.departureText);
+        appendPaxResultDetail(details, "Fahrerziel", result.hasDestination ? "hinterlegt" : null);
+        appendPaxResultDetail(details, "Entfernung", result.distanceText);
+        appendPaxResultDetail(details, "Plätze", result.seatText);
+        appendPaxResultDetail(details, "Preis", result.priceText);
+        appendPaxResultDetail(details, "Signal", result.liveText);
+        item.appendChild(details);
+
+        item.addEventListener("click", () => {
+          selectPaxResult(result.driverKey);
+          togglePaxResultDetails(result.driverKey);
+        });
+        item.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ") return;
+          ev.preventDefault();
+          selectPaxResult(result.driverKey);
+          togglePaxResultDetails(result.driverKey);
+        });
+        listEl.appendChild(item);
+      }
+      updatePaxMatchingSector();
+    }
+
     function runPaxSearch() {
       const inputLocked = isPaxInputLocked();
       if (!map || paxLat === null || paxLng === null) return;
       if (paxTargetLat === null || paxTargetLng === null) return;
       if (inputLocked) return;
       if (!commitPaxTimeInput(true)) return;
+      const paxSearchMs = getPaxSearchDateTimeMs();
+      if (!Number.isFinite(paxSearchMs)) {
+        showHint("Bitte gültiges Datum und eine zukünftige Startzeit wählen.");
+        return;
+      }
 
       if (isPaxRateLimited()) {
         const statusEl = document.getElementById("paxMatchStatus");
@@ -3087,7 +3677,9 @@
         const candidates = [];
         for (const [driverKey, pos] of positions.entries()) {
           if (endedDrivers.has(driverKey)) continue;
-          if (!hasPublicRideForDriver(driverKey)) continue;
+          const publicRide = getPublicRideForDriver(driverKey);
+          if (!publicRide) continue;
+          if (!isRideWithinPaxTimeWindow(publicRide, paxSearchMs)) continue;
           const ageMs = now - (pos.ts || 0);
           if (ageMs > RIDE_FRESH_MS) continue;
           const distKm = haversineKm(paxLat, paxLng, pos.lat, pos.lng);
@@ -3105,11 +3697,11 @@
       // Sortierung: nächster zuerst
       hits.sort((a, b) => a.distKm - b.distKm);
       for (const { driverKey } of hits) paxMatchedKeys.add(driverKey);
+      openPaxResultDriverKey = null;
 
       paxSearchActive = true;
       refreshPaxMatchLayer();
       let statusEl = null;
-      let listEl = null;
       updatePaxUI();
       updatePanelSearchStatus();
 
@@ -3117,59 +3709,18 @@
       statusEl = document.getElementById("paxMatchStatus");
       if (statusEl) {
         if (hits.length > 0) {
-          statusEl.textContent = `${hits.length} Fahrer gefunden (${foundAtKm} km Umkreis) ✅`;
+          statusEl.textContent = `${hits.length} Fahrer gefunden (${foundAtKm} km Umkreis)`;
           statusEl.className = "pax-match-status show found";
         } else {
           statusEl.textContent = "Keine passenden Fahrer in 10 km Umkreis.";
           statusEl.className = "pax-match-status show none";
         }
+        updatePaxMatchingSector();
       }
 
       // Trefferliste rendern
-      listEl = document.getElementById("paxResultList");
-      if (listEl) {
-        listEl.innerHTML = "";
-        if (hits.length > 0) {
-          listEl.style.display = "flex";
-          for (const { driverKey, pos, distKm } of hits) {
-            const distText = distKm < 1
-              ? `${Math.round(distKm * 1000)} m`
-              : `${distKm.toFixed(1)} km`;
-            const ride = getPublicRideForDriver(driverKey);
-            const seats = Number(ride?.plaetze);
-            const seatText = Number.isFinite(seats) && seats > 0 ? `${seats} Platz/Plätze` : null;
-            const priceText = formatSeatPrice(ride?.preis);
-            const item = document.createElement("div");
-            item.className = "pax-result-item";
-            item.dataset.driverKey = driverKey;
-            const name = document.createElement("div");
-            name.className = "pax-result-name";
-            name.textContent = ride?.fahrer_name || pos.driver_id || driverKey;
-            const meta = document.createElement("div");
-            meta.className = "pax-result-meta";
-            [distText, seatText, priceText].filter(Boolean).forEach((text) => {
-              const pill = document.createElement("span");
-              pill.className = "pax-result-pill";
-              pill.textContent = text;
-              meta.appendChild(pill);
-            });
-            const cta = document.createElement("span");
-            cta.className = "pax-result-cta";
-            cta.textContent = "Fahrt ansehen";
-            item.appendChild(name);
-            item.appendChild(meta);
-            item.appendChild(cta);
-            const snapLng = pos.lng;
-            const snapLat = pos.lat;
-            item.addEventListener("click", () => {
-              map.easeTo({ center: [snapLng, snapLat], zoom: 15, duration: 500 });
-            });
-            listEl.appendChild(item);
-          }
-        } else {
-          listEl.style.display = "none";
-        }
-      }
+      paxRideResults = hits.map(hit => buildPaxRideResult(hit, foundAtKm));
+      renderPaxResults(paxRideResults);
     }
 
     function cancelPaxSearch() {
@@ -3182,9 +3733,8 @@
       updatePaxUI();
       updatePanelSearchStatus();
       const statusEl = document.getElementById("paxMatchStatus");
-      if (statusEl) { statusEl.textContent = ""; statusEl.className = "pax-match-status"; }
-      const listEl = document.getElementById("paxResultList");
-      if (listEl) { listEl.innerHTML = ""; listEl.style.display = "none"; }
+      if (statusEl) { statusEl.textContent = ""; statusEl.className = "pax-match-status"; updatePaxMatchingSector(); }
+      clearPaxResults();
       // Cooldown NUR hier starten – Eingabephase (Zeitfenster, Zieltext) bleibt frei
       startPaxCooldown();
     }
@@ -3194,13 +3744,9 @@
       if (!key || !paxSearchActive || !paxMatchedKeys.has(key)) return false;
 
       paxMatchedKeys.delete(key);
-      const listEl = document.getElementById("paxResultList");
-      if (listEl) {
-        for (const item of listEl.querySelectorAll(".pax-result-item")) {
-          if (item.dataset.driverKey === key) item.remove();
-        }
-        listEl.style.display = paxMatchedKeys.size > 0 ? "flex" : "none";
-      }
+      paxRideResults = paxRideResults.filter(result => result.driverKey !== key);
+      if (openPaxResultDriverKey === key) openPaxResultDriverKey = null;
+      renderPaxResults(paxRideResults);
 
       if (paxMatchedKeys.size === 0) {
         paxSearchActive = false;
@@ -3454,6 +4000,7 @@
 
     function hideAllDriverLayersImmediately() {
       if (!map) return;
+      clearDriverLiveMarkers();
       if (map.getLayer(LAYER_CLUSTER_CIRCLE)) map.setFilter(LAYER_CLUSTER_CIRCLE, ["==", ["get", "point_count"], -1]);
       if (map.getLayer(LAYER_CLUSTER_COUNT)) map.setFilter(LAYER_CLUSTER_COUNT, ["==", ["get", "point_count"], -1]);
       if (map.getLayer(LAYER_POINTS)) map.setFilter(LAYER_POINTS, ["==", ["get", "driverKey"], "__none__"]);
@@ -3479,10 +4026,11 @@
       });
       map.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-color":"#334155","circle-radius":["step",["get","point_count"],18,10,22,25,28],"circle-opacity":0.9}});
       map.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-size":12},paint:{"text-color":"#fff"}});
-      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",9.2,["*",["get","pulseScale"],1.6]],"circle-color":"rgba(34,197,94,0)","circle-stroke-color":"rgba(34,197,94,0.88)","circle-stroke-width":["+",1.1,["*",["-",1,["get","pulseScale"]],0.9]],"circle-opacity":["get","pulseOpacity"]}});
-      map.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0.96]}});
-      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","#22c55e"],"circle-stroke-color":"rgba(11,15,20,0.18)","circle-stroke-width":1,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.98]}});
+      map.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:getDriverPinPulsePaint()});
+      map.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","stale"],1]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0]}});
+      map.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F",DRIVER_PIN_COLOR],"circle-stroke-color":"rgba(11,15,20,0.18)","circle-stroke-width":1,"circle-opacity":["case",["==",["get","stale"],1],0.58,0.001]}});
       map.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":"#60a5fa","circle-stroke-width":3,"circle-opacity":0.92}});
+      keepDriverPinPulseLayerVisible();
     }
     function refreshDriversSource(reason = "unknown") {
       if (!map || !map.getSource(DRIVERS_SOURCE)) return;
@@ -3531,6 +4079,7 @@
       applyDefaultDriverLayerFilters();
       logMapPath("refreshDriversSource:before-setData", { markerFeatures: feats.length, sourceFeatureCountBefore: getDriverSourceFeatureCount() });
       setDriversSourceData({ type: "FeatureCollection", features: feats });
+      syncDriverLiveMarkers(feats);
       logMapPath("refreshDriversSource:after-setData", { markerFeatures: feats.length, sourceFeatureCountAfter: getDriverSourceFeatureCount() });
       updateSelectedLayerFilter();
       setCount(feats.length);
@@ -3624,7 +4173,7 @@
               driverId: ride.driver_id || "",
               route_state: routeState,
               stale: routeState === "stale" ? 1 : 0,
-              color: routeState === "active" ? "#B7D532" : routeState === "planned" ? "#f59e0b" : "#6B7A8F"
+              color: routeState === "stale" ? "#6B7A8F" : "#4F46E5"
             },
             geometry: { type: "LineString", coordinates: coords }
           });
@@ -3632,6 +4181,7 @@
       }
 
       map.getSource(RIDES_SOURCE).setData({ type: "FeatureCollection", features: destFeatures });
+      syncRideDestinationMarkers(destFeatures);
 
       if (map.getSource(RIDES_ROUTE_SOURCE)) {
         map.getSource(RIDES_ROUTE_SOURCE).setData({ type: "FeatureCollection", features: routeFeatures });
@@ -4585,11 +5135,9 @@
 
     const pulseTimer = setInterval(() => {
       if (!map || !isTabVisible() || !map.getSource(DRIVERS_SOURCE)) return;
-      const hasLiveDriver = [...positions.keys()].some((driverKey) =>
-        hasPublicRideForDriver(driverKey) && getDriverRouteState(driverKey) === "active"
-      );
-      if (!hasLiveDriver) return;
+      if (!hasVisibleLiveDriverPulseCandidate()) return;
       refreshDriversSource("pulseTimer");
+      updateDriverPinPulsePaint();
       map.triggerRepaint?.();
     }, 180);
 
@@ -4817,6 +5365,8 @@
       try { if (map && map.getLayer(LAYER_PAX_MATCH)) map.removeLayer(LAYER_PAX_MATCH); } catch (_) {}
       try { if (map && map.getSource(PAX_MATCH_SOURCE)) map.removeSource(PAX_MATCH_SOURCE); } catch (_) {}
       try { if (paxCooldownTimer) { clearInterval(paxCooldownTimer); paxCooldownTimer = null; } } catch (_) {}
+      try { clearDriverLiveMarkers(); } catch (_) {}
+      try { clearRideDestinationMarkers(); } catch (_) {}
       try { if (paxTargetMarker) { paxTargetMarker.remove(); paxTargetMarker = null; } } catch (_) {}
       try { if (markerPopup) markerPopup.remove(); } catch (_) {}
       try { if (ridePopup)   ridePopup.remove();   } catch (_) {} // NEU
@@ -4869,9 +5419,9 @@
         m.addSource(DRIVERS_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]},cluster:true,clusterRadius:48,clusterMaxZoom:14});
         m.addLayer({id:LAYER_CLUSTER_CIRCLE,type:"circle",source:DRIVERS_SOURCE,filter:["has","point_count"],paint:{"circle-radius":["step",["get","point_count"],16,25,20,50,26,100,32],"circle-color":"rgba(199,223,58,0.70)","circle-stroke-width":1,"circle-stroke-color":"rgba(17,24,37,0.35)"}});
         m.addLayer({id:LAYER_CLUSTER_COUNT,type:"symbol",source:DRIVERS_SOURCE,filter:["has","point_count"],layout:{"text-field":["get","point_count_abbreviated"],"text-font":["DIN Offc Pro Medium","Arial Unicode MS Bold"],"text-size":12},paint:{"text-color":"#0b0f14"}});
-        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:{"circle-radius":["+",9.2,["*",["get","pulseScale"],1.6]],"circle-color":"rgba(34,197,94,0)","circle-stroke-color":"rgba(34,197,94,0.88)","circle-stroke-width":["+",1.1,["*",["-",1,["get","pulseScale"]],0.9]],"circle-opacity":["get","pulseOpacity"]}});
-        m.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0.96]}});
-        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F","rgba(199,223,58,0.98)"],"circle-opacity":["case",["==",["get","stale"],1],0.58,1],"circle-stroke-width":1,"circle-stroke-color":"rgba(11,15,20,0.18)"}});
+        m.addLayer({id:`${LAYER_POINTS}-pulse`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","isLive"],1]],paint:getDriverPinPulsePaint()});
+        m.addLayer({id:`${LAYER_POINTS}-ring`,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","stale"],1]],paint:{"circle-radius":10,"circle-color":"rgba(255,255,255,0)","circle-stroke-color":["case",["==",["get","stale"],1],"rgba(255,255,255,0.68)","rgba(255,255,255,0.88)"],"circle-stroke-width":2.5,"circle-opacity":["case",["==",["get","stale"],1],0.68,0]}});
+        m.addLayer({id:LAYER_POINTS,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]]],paint:{"circle-radius":6.5,"circle-color":["case",["==",["get","stale"],1],"#6B7A8F",DRIVER_PIN_COLOR],"circle-opacity":["case",["==",["get","stale"],1],0.58,0.001],"circle-stroke-width":1,"circle-stroke-color":"rgba(11,15,20,0.18)"}});
         m.addLayer({id:LAYER_POINTS_SELECTED,type:"circle",source:DRIVERS_SOURCE,filter:["all",["!",["has","point_count"]],["==",["get","driverKey"],"__none__"]],paint:{"circle-radius":12,"circle-color":"rgba(255,255,255,0)","circle-stroke-width":3,"circle-stroke-color":"#60a5fa","circle-opacity":0.92}});
         m.on("click",LAYER_CLUSTER_CIRCLE,(e)=>{const f=e.features?.[0];if(!f)return;m.getSource(DRIVERS_SOURCE).getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{if(!err)m.easeTo({center:f.geometry.coordinates,zoom,duration:550});});});
         m.on("click",LAYER_POINTS,async(e)=>{const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:650});openMarkerPopupFromFeature(f);await fetchLatest().catch(()=>{});await fetchRouteHistory().catch(()=>{});refreshDriversSource("driver-marker-click");onVisibilityOrPanelChange();});
@@ -4889,7 +5439,7 @@
           source:RIDES_ROUTE_SOURCE,
           filter:["==",["get","stale"],0],
           layout:{"line-join":"round","line-cap":"round"},
-          paint:{"line-color":"#B7D532","line-width":4,"line-opacity":0.92}
+          paint:{"line-color":"#4F46E5","line-width":4,"line-opacity":0.92}
         });
         m.addLayer({
           id:`${LAYER_RIDE_ROUTES}-stale`,
@@ -4912,7 +5462,7 @@
       // Ride-Ziele
       if (!m.getSource(RIDES_SOURCE)) {
         m.addSource(RIDES_SOURCE,{type:"geojson",data:{type:"FeatureCollection",features:[]}});
-        m.addLayer({id:LAYER_RIDE_DEST,type:"circle",source:RIDES_SOURCE,paint:{"circle-radius":10,"circle-color":"#ff9500","circle-opacity":["case",["==",["get","stale"],1],0.65,0.92],"circle-stroke-width":2.5,"circle-stroke-color":"rgba(255,255,255,0.80)"}});
+        m.addLayer({id:LAYER_RIDE_DEST,type:"circle",source:RIDES_SOURCE,paint:{"circle-radius":10,"circle-color":DRIVER_DEST_PIN_COLOR,"circle-opacity":0.001,"circle-stroke-width":2.5,"circle-stroke-color":"rgba(255,255,255,0.80)","circle-stroke-opacity":0}});
         m.on("click",LAYER_RIDE_DEST,(e)=>{e.originalEvent?.stopPropagation();const f=e.features?.[0];if(!f)return;m.easeTo({center:f.geometry.coordinates,zoom:14,duration:550});openRidePopup(f);});
         m.on("mouseenter",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="pointer";});
         m.on("mouseleave",LAYER_RIDE_DEST,()=>{m.getCanvas().style.cursor="";});
@@ -4932,6 +5482,7 @@
         });
       }
       refreshSelectedRouteSource();
+      keepDriverPinPulseLayerVisible();
       const btn=document.getElementById("btnToggleRoutes");
       if(btn)btn.textContent=routesVisible?"Ausblenden":"Einblenden";
       routesReady=true;
